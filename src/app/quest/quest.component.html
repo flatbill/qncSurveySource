@@ -1,0 +1,178 @@
+
+
+
+<div class='mr-3 ml-3 mt-3 mb-3'>
+  <span class='tag is-dark is-small' 
+    *ngIf='msg1.length > 0'>
+    {{msg1}} 
+  </span>
+</div>
+ 
+<section *ngIf="showSignHtml" class='mr-2 ml-3 mt-3' >
+  <table class=' table has-background-success-light is-narrow'>
+    <tr>
+      <td><label>First Name: </label></td>
+      <td><input  
+        autofocus
+        value= {{firstNameInput}}
+        size="16"
+        (change)=firstNameChg($event)
+        autocomplete="off"></td>
+    </tr>
+    <tr>
+      <td><label>Last Name: </label></td>
+      <td><input  
+        
+        value= {{lastNameInput}}
+        size="16"
+        (change)=lastNameChg($event)
+        autocomplete="off"></td>
+    </tr>
+    <tr>
+      <td><label>Phone (last four digits): </label></td>
+      <td><input  
+        maxlength="4"
+        value= {{phoneInput}}
+        size="4"
+        (change)=phoneChg($event)
+        autocomplete="off"></td>
+    </tr>
+
+    <tr> <td>&nbsp;</td> 
+      <td><button 
+        class='button is-link is-pulled-right  is-small is-outlined'
+        (click)='doSign()'
+        >go</button></td>
+    </tr>
+  </table>
+  &nbsp;
+</section>
+
+<button *ngIf="showDiagButHtml" class='button is-link'(click)='setDiagnosticsOnOff()'>
+  show/hide diagnostics 
+</button>
+
+<!-- start diagnostics -->
+<section *ngIf="showDiagHtml" class='ml-2' >
+  <div>
+    previous answer points: {{hisAnsPoints}} <br>
+    answers stored to db so far:  {{answerCnt}} <br>
+    scoring rounds completed so far: {{scoreRound-1}} <br>
+    scores stored to db so far:  {{scoreRecsWritten}} <br>
+  </div>
+  <div>
+    <button class='button is-link'(click)='massDeleteAnswers()'>
+      mass delete answers
+    </button>
+    <br>
+    <br>
+    <button class='button is-link'(click)='massDeleteScores()'>
+      mass delete scores
+    </button>  
+    <br>
+    <br>
+
+  </div>
+
+  <table class='table is-striped  is-bordered'>
+    <thead class='has-background-info'>
+      <tr>
+        <th>subset</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let s of subsetArray">
+        <th> {{s.subset}} </th>
+      </tr>
+    </tbody>
+  </table>
+
+  <table class='table is-striped  is-bordered'>
+    <thead class='has-background-info'>
+      <tr>
+        <th>nbr</th>
+        <th>preQuest</th>
+        <th>questTxt</th>
+        <th>subset</th>
+        <th>accum</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let q of allQuestions">
+        <th> {{q.questNbr}} </th>
+        <th> {{q.preQuest}} </th>
+        <th>  {{q.questTxt}} </th>
+        <th>  {{q.subset}} </th>
+        <th>  {{q.accum[0]}} </th>
+      </tr>
+    </tbody>
+  </table>
+
+  <table class='table is-striped  is-bordered'>
+    <thead class='has-background-info'>
+      <tr>
+        <th>accum</th>
+        <th>oper</th>
+        <th>thresh</th>
+        <th>subset</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let r of rulesArray">
+        <th> {{r.accum}}   </th>
+        <th> {{r.oper}}    </th>
+        <th>  {{r.thresh}} </th>
+        <th>  {{r.subset}} </th>
+      </tr>
+    </tbody>
+  </table>
+
+  <table class='table is-striped  is-bordered'>
+    <thead class='has-background-info'>
+      <tr>
+        <th>nbr</th>
+        <th>preQuest</th>
+        <th>questTxt</th>
+        <th>subset</th>
+        <th>accum</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let q of activeQuestions">
+        <th> {{q.questNbr}} </th>
+        <th> {{q.preQuest}} </th>
+        <th>  {{q.questTxt}} </th>
+        <th>  {{q.subset}} </th>
+        <th>  {{q.accum[0]}} </th>
+      </tr>
+    </tbody>
+  </table>
+
+</section>
+<!-- end diagnostics -->
+
+<section *ngIf="showQuestHtml" class="hero">
+  <div class="hero-body">
+    <div class="container">
+      <h3 class="subtitle has-text-centered"> {{curPreQuest}}  </h3>
+      <h2 class='title has-text-centered'> {{curQuestTxt}} </h2>
+    </div>
+  </div>
+</section >
+
+<div *ngIf="showAnswerGroupHtml" class="level">
+  <div *ngFor="let caf of curAcaFrame"
+        class='level-item'  > {{caf}}
+  </div>
+</div>
+
+<div *ngIf="showAnswerGroupHtml" class="columns box "> 
+  <div class="column " *ngFor="let x of curAca; let i = index">
+    <button class='button is-link is-fullwidth'(click)='answerClicked(i)'>{{x}}</button>
+  </div>
+</div>
+
+ 
+<div *ngIf="showWrapUpHtml" class=" ml-3 mr-3 has-background-primary-light" >  
+  {{msg2}}
+</div>
