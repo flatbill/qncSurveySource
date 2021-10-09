@@ -292,6 +292,67 @@ const qtReadTeamMembers = (teamMemberParmIn) => {
    .then((response) => {
     return response.json()
   })
+} 
+const qtReadScoreboards = (custParmIn,qidParmIn) => {
+  let myUrl =  'https://stupefied-elion-621b07.netlify.app/.netlify/functions/qtReadScoreboards'
+  + '?cust=' + custParmIn
+  + '&qid=' + qidParmIn
+  return fetch(myUrl)
+   .then((response) => {
+    return response.json()
+  })
+}
+
+const qtUpdateScoreboard = (data) => {
+  return fetch(`https://stupefied-elion-621b07.netlify.app/.netlify/functions/qtUpdateScoreboard`, {
+    body: JSON.stringify(data),
+    method: 'POST'
+  }).then(response => {
+    return response.json()
+  })
+}
+const qtDeleteScoreboard = (data) => {
+  return fetch(`https://stupefied-elion-621b07.netlify.app/.netlify/functions/qtDeleteScoreboard`, {
+    body: JSON.stringify(data),
+    method: 'POST'
+  }).then(response => {
+    return response.json()
+  })
+}
+const qtAddScoreboard = (data) => {
+  return fetch(`https://stupefied-elion-621b07.netlify.app/.netlify/functions/qtAddScoreboard`, {
+    body: JSON.stringify(data),
+    method: 'POST'
+  }).then(response => {
+    return response.json()
+  })
+}
+const qtAddParticipant = (data) => {
+  return fetch(`https://stupefied-elion-621b07.netlify.app/.netlify/functions/qtAddParticipant`, {
+    body: JSON.stringify(data),
+    method: 'POST'
+  }).then(response => {
+    return response.json()
+  })
+}
+const qtUpdateParticipant = (data) => {
+  return fetch(`https://stupefied-elion-621b07.netlify.app/.netlify/functions/qtUpdateParticipant`, {
+    body: JSON.stringify(data),
+    method: 'POST'
+  }).then(response => {
+    return response.json()
+  })
+}
+
+const qtReadUser = (custParmIn,qidParmIn,userParmIn) => {
+  let myUrl =  'https://stupefied-elion-621b07.netlify.app/.netlify/functions/qtReadUser'
+  + '?cust=' + custParmIn
+  + '&qid=' + qidParmIn
+  + '&user=' + userParmIn
+  return fetch(myUrl)
+   .then((response) => {
+    return response.json()
+  })
 }
 
 export default  {
@@ -324,7 +385,14 @@ export default  {
   qtReadAnswers: qtReadAnswers,
   qtReadInvitations: qtReadInvitations,
   qtReadUsers: qtReadUsers,
+  qtReadUser: qtReadUser,
   qtReadSubscribers: qtReadSubscribers,
-  qtReadTeamMembers: qtReadTeamMembers
+  qtReadTeamMembers: qtReadTeamMembers,
+  qtReadScoreboards: qtReadScoreboards,
+  qtAddScoreboard: qtAddScoreboard,
+  qtAddParticipant:qtAddParticipant,
+  qtUpdateScoreboard: qtUpdateScoreboard,
+  qtUpdateParticipant: qtUpdateParticipant,
+  qtDeleteScoreboard: qtDeleteScoreboard
 }
 

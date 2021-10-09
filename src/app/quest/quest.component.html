@@ -13,28 +13,30 @@
     <tr>
       <td><label>First Name: </label></td>
       <td><input  
+        #firstName
         autofocus
         value= {{firstNameInput}}
         size="16"
-        (change)=firstNameChg($event)
+        (change)=firstNameChg(firstName.value)
         autocomplete="off"></td>
     </tr>
     <tr>
       <td><label>Last Name: </label></td>
       <td><input  
-        
+        #lastName
         value= {{lastNameInput}}
         size="16"
-        (change)=lastNameChg($event)
+        (change)=lastNameChg(lastName.value)
         autocomplete="off"></td>
     </tr>
     <tr>
       <td><label>Phone (last four digits): </label></td>
       <td><input  
+        #phone
         maxlength="4"
         value= {{phoneInput}}
         size="4"
-        (change)=phoneChg($event)
+        (change)=phoneChg(phone.value)
         autocomplete="off"></td>
     </tr>
 
@@ -141,9 +143,9 @@
       <tr *ngFor="let q of activeQuestions">
         <th> {{q.questNbr}} </th>
         <th> {{q.preQuest}} </th>
-        <th>  {{q.questTxt}} </th>
-        <th>  {{q.subset}} </th>
-        <th>  {{q.accum[0]}} </th>
+        <th> {{q.questTxt}} </th>
+        <th> {{q.subset}}   </th>
+        <th> {{q.accum[0]}} </th>
       </tr>
     </tbody>
   </table>
@@ -154,21 +156,28 @@
 <section *ngIf="showQuestHtml" class="hero">
   <div class="hero-body">
     <div class="container">
-      <h3 class="subtitle has-text-centered"> {{curPreQuest}}  </h3>
-      <h2 class='title has-text-centered'> {{curQuestTxt}} </h2>
+      <h3 *ngIf='!questHasLinBrk' class="subtitle mb-5 has-text-centered"> 
+        {{curPreQuest}}  </h3>
+      <h3 *ngIf='questHasLinBrk' class="subtitlev mb-5">         
+        {{curPreQuest}}  </h3>
+      <h2 *ngIf='!questHasLinBrk' class='title  has-text-centered'> 
+        {{curQuestTxt}} </h2>
+      <h2 *ngIf='questHasLinBrk' class='title  selz-pre-line'> 
+        {{curQuestTxt}} </h2>
     </div>
   </div>
 </section >
 
-<div *ngIf="showAnswerGroupHtml" class="level">
+<div *ngIf="showAnswerGroupHtml" class="level is-mobile">
   <div *ngFor="let caf of curAcaFrame"
-        class='level-item'  > {{caf}}
+        class='level-item has-text-weight-semibold'  > {{caf}}
   </div>
 </div>
 
-<div *ngIf="showAnswerGroupHtml" class="columns box "> 
-  <div class="column " *ngFor="let x of curAca; let i = index">
-    <button class='button is-link is-fullwidth'(click)='answerClicked(i)'>{{x}}</button>
+<div *ngIf="showAnswerGroupHtml" class="columns is-mobile box "> 
+  <div class="column" *ngFor="let x of curAca; let i = index">
+    <button class='button is-link is-fullwidth'
+    (click)='answerClicked(i)'>{{x}}</button>
   </div>
 </div>
 

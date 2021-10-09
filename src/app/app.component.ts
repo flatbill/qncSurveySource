@@ -3,12 +3,11 @@ import api from 'src/utils/api'
 //src\utils\api.js
 @Component({
   selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss']
+  templateUrl: './app.component.html'
 })
 export class AppComponent {
 
-  siteTitle = ' QnC.   Surveys your way.'
+  siteTitle = ' Qnc Survey'
   // //initialCountInAppComponent: number = 10
   // myCount: number = 1000;
   // myFriend = '?'

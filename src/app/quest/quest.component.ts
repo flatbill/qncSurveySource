@@ -3,8 +3,7 @@ import api from 'src/utils/api'
 
 @Component({
   selector: 'app-quest',
-  templateUrl: './quest.component.html',
-  styleUrls: ['./quest.component.css']
+  templateUrl: './quest.component.html'
 })
 export class QuestComponent implements OnInit {
   constructor() {}
@@ -66,6 +65,9 @@ export class QuestComponent implements OnInit {
   userFoundInDb = false
   pastAnswers = []
   showDiagButHtml = false  // turn on with ctrl shift alt
+  wrapUpWaitForPriorDbUpdate = false
+  questHasLinBrk = false // questions with line breaks hit different html
+
   //billy, maybe create question rec layout, like dateCodeCatalog.
   // right now, questions just follow the db rec layout.
   // is that good enuff, or will it be confusing later?
@@ -145,8 +147,8 @@ export class QuestComponent implements OnInit {
       // db function chaining, see .then
       // readuser > readsubsets > readquestions
       this.msg1 =  "let's look you up, " + this.firstNameInput + ' ...'
-      this.qtReadUser(Event) 
-      // pgm will continue in .then of qtReadUser
+      this.qtReadParticipants() 
+      // pgm will continue in .then of qtReadParticipants
     }
   }
 
@@ -164,26 +166,32 @@ export class QuestComponent implements OnInit {
     }
   } // end validateSignOn
 
-  firstNameChg(ev){
-    this.firstNameInput = 
-      ev.target.value[0].toUpperCase() + ev.target.value.substring(1)
+  firstNameChg(firstNameParmIn){
+   // this.firstNameInput = 
+   //   ev.target.value[0].toUpperCase() + ev.target.value.substring(1)
+   this.firstNameInput = 
+     firstNameParmIn[0].toUpperCase() + firstNameParmIn.substring(1)
   }
 
-  lastNameChg(ev){
+  lastNameChg(lastNameParmIn){
+    // this.lastNameInput = 
+    //   ev.target.value[0].toUpperCase() + ev.target.value.substring(1)
     this.lastNameInput = 
-      ev.target.value[0].toUpperCase() + ev.target.value.substring(1)
+      lastNameParmIn[0].toUpperCase() + lastNameParmIn.substring(1)
   }
 
-  phoneChg(ev){
-    this.phoneInput = ev.target.value 
+  phoneChg(phoneParmIn){
+    // this.phoneInput = ev.target.value 
+    this.phoneInput = phoneParmIn 
   }
 
   buildUserObj(dbUserObj){
+    console.log('dbUserObj:')
+    console.table(dbUserObj)
     if (dbUserObj.length > 0){
-      console.log('user is found in dbb')
+      console.log('user is found in db')
       this.msg1 = 'welcome back, ' + this.firstNameInput + '.'
       this.userFoundInDb = true
-
       this.userObj =
       {
         "cust": this.cust,
@@ -197,10 +205,10 @@ export class QuestComponent implements OnInit {
         "priorQ": dbUserObj[0].data.priorQ
       }
     }
-    if (dbUserObj.length ==0){
-      console.log('user not found in dbb')
-      this.userFoundInDb = false
 
+    if (dbUserObj.length ==0){
+      console.log('user not found in db')
+      this.userFoundInDb = false
       this.userObj =
       {
         "cust": this.cust,
@@ -215,9 +223,12 @@ export class QuestComponent implements OnInit {
       }
       console.table(this.userObj)
     }
-    // for an exising user that is continuing,
-    // cuz they help set a reduced question list.
-    console.log('182')
+
+    // billy, if returning user,
+    // re-position an exising user that is continuing.
+    // maybe somewhere, create a shrunken down list of questions,
+    // to only those questions that were NOT asked already.
+    console.log('229 is he a returning user?')
     console.table(this.userObj)
   } // end buildUserObj
 
@@ -226,11 +237,9 @@ export class QuestComponent implements OnInit {
     // is the user signing on, but has completed the survey already?
     // is the user returning after partial completion?
     // can we shrink the remaining question list ?
-    // like, maybe if priorQ == 777 then delete all questions before 777.
-    // assumes that the question list is sorted nicely.
     // hey what about subsets? 
-    // ... or .... is this more bulletproof?
-    // if previously partially-completed, maybe match his prior answers
+    //  
+    // if previously partially-completed, match his prior answers
     // to the question list.
     // delete from question list if he answered already.
     //
@@ -244,8 +253,9 @@ export class QuestComponent implements OnInit {
     // then insert a new user rec.
     // john smith  1111 May13 INACTIVE
     // john smith  1111 May14 ACTIVE
-    if (this.userFoundInDb &&   this.userObj[ "priorQ" ] > 0) {
-      this.launchQtReadAnswers(Event) // find past answers. has chaining.
+    // as of Oct 2021, expect repeat participant to use a different name.
+    if (this.userFoundInDb &&  this.userObj[ "priorQ" ] > 0) {
+      this.launchQtReadAnswers() // find past answers. has chaining.
     }
   } // end chkUserStatus
 
@@ -274,21 +284,21 @@ export class QuestComponent implements OnInit {
     }
     if (  ! this.userFoundInDb) {
       // new user, add a db rec.
-      this.launchQtWriteUser(Event)
+      this.launchQtAddParticipant()
     }
   }  // end upsertUser
 
-  setUserFieldsAfterAnswer() {
-    console.log('running setUserFieldsAfterAnswer')
-    // he answered a question. lets remember how far he got.
-    // set user info into userObj for some user attributes
-    // bizzarre bracket notation -- this.myObj[ "foo" ]  typescript sucks.
-    Object.assign(this.userObj,{userDateTime: this.dateTimeNow })
-    Object.assign(this.userObj,{status:  'active' })
-    Object.assign(this.userObj,{priorQ:  this.answerObj[ "questNbr" ]})
-    //alert(this.answerObj[ "questNbr" ])
-    console.table(this.userObj)
-  } // end setUserFieldsAfterAnswer
+  // setUserFieldsAfterAnswer() {
+  //   console.log('running setUserFieldsAfterAnswer')
+  //   // he answered a question. lets remember how far he got.
+  //   // set user info into userObj for some user attributes
+  //   // bizzarre bracket notation -- this.myObj[ "foo" ]  typescript sucks.
+  //   Object.assign(this.userObj,{userDateTime: this.dateTimeNow })
+  //   Object.assign(this.userObj,{status:  'active' })
+  //   Object.assign(this.userObj,{priorQ:  this.answerObj[ "questNbr" ]})
+  //   //alert(this.answerObj[ "questNbr" ])
+  //   //console.table(this.userObj)
+  // } // end setUserFieldsAfterAnswer
 
   answerClicked(hisAnsAcaIxFromHtml) {
     console.log('running answerClicked')
@@ -302,6 +312,11 @@ export class QuestComponent implements OnInit {
       this.curPreQuest = this.activeQuestions[this.aqx].preQuest 
       this.curAca = this.activeQuestions[this.aqx].aca 
       this.curAcaFrame = this.activeQuestions[this.aqx].acaFrame
+      if(this.curQuestTxt.includes('\n')) {
+        this.questHasLinBrk = true
+      } else {
+        this.questHasLinBrk = false
+      } // end if includes \n
     } else { //we are at the end of active questions
         console.log('306 we are at the end of a subset ')
         this.closeOutActiveAndPrepNextQuestions()
@@ -311,19 +326,24 @@ export class QuestComponent implements OnInit {
           this.curQuestTxt = this.activeQuestions[0].questTxt
           this.curAca = this.activeQuestions[0].aca
           this.curAcaFrame = this.activeQuestions[0].acaFrame
-
+          if(this.curQuestTxt.includes('\n')) {
+            this.questHasLinBrk = true
+          } else {
+            this.questHasLinBrk = false
+          } // end if includes \n
         } else {
-          this.wrapUp() //we are done with qNa.
+          console.log('running answerClicked 321, gonna wrapUp')
+          this.wrapUp() //we are done with qNa. 
         } // end if activeQuest length >0
     } // end if this.aqx
   } // end answerClicked
 
   closeOutActiveAndPrepNextQuestions(){
-    console.log('closeOutActiveAndPrepNextQuestions')
+    console.log('running closeOutActiveAndPrepNextQuestions')
     for (let i = 0; i < this.subsetArray.length; i++) {
       if (this.subsetArray[i].ssStatusQnA == 'active') {
           // console.log('143 setting status to done for subset:')
-        console.log( this.subsetArray[i].subset)
+        console.log( 'subset: ',this.subsetArray[i].subset)
         this.subsetArray[i].ssStatusQnA = 'done'
       }
     }
@@ -349,7 +369,7 @@ export class QuestComponent implements OnInit {
   }  // end calcAnswerTimeGap
 
   storeAnswer(hisAnsAcaIx){
-    //console.log('running storeAnswer')
+    console.log('running storeAnswer')
     // for the recently answered question (the active question),
     // set a point value into hisAnsPoints.
     // he gave an answer, and we captured it into hisAnsAcaIx.
@@ -364,7 +384,7 @@ export class QuestComponent implements OnInit {
       // for his answer
     this.buildAnswerFields()
     this.answerArray.push(this.answerObj)
-    this.writeAnswerToDb(Event) //has its own chaining  .then
+    this.writeAnswerToDb() //has its own chaining  .then
     // billy ya might want to
     // first, look for an existing answer in the db and replace it.
     // if no existing answer, then insert one.
@@ -373,6 +393,7 @@ export class QuestComponent implements OnInit {
   } //end storeAnswer
 
   buildAnswerFields(){
+    console.log('running buildAnswerFields')
     this.answerObj = 
     {
       "cust": this.cust,
@@ -397,33 +418,38 @@ export class QuestComponent implements OnInit {
         // console.log('my answer object', this.answerObj)
   } // end buildAnswerFields
 
-  writeAnswerToDb(e){
-    //console.log('running writeAnswerToDb')
+  writeAnswerToDb(){
+    console.log('running writeAnswerToDb')
     // writing to the db is helpful for some other later time,
     // but for now, only the answerArray is useful.
     this.msg1 = 'writing answer to database...'
+    this.wrapUpWaitForPriorDbUpdate = true
     api.qtWriteAnswer(this.answerObj)
         .then 
         (   (qtDbRtnObj) => 
           {
+            console.log('running .then of api.qtWriteAnswer')
             this.qtDbDataObj = qtDbRtnObj.data
             this.answerCnt = this.answerCnt + 1
+            // this.setUserFieldsAfterAnswer() // remember how far he got.
+            // check for  wrapup, cuz of async.
             if (! this.showWrapUpHtml) { // show progress if we arent done.
               this.msg1 = this.firstNameInput + "'s " 
               + 'answer count: ' + this.answerCnt 
-              // setting msg1 here clobbers  wrapup, cuz of async.
+              Object.assign(this.userObj,{userDateTime: this.dateTimeNow })
+              Object.assign(this.userObj,{status:  'active' })
+              Object.assign(this.userObj,{priorQ:  this.answerObj[ "questNbr" ]})
+              this.updateParticipantDb('from writeAnswer')  
             }
-            this.setUserFieldsAfterAnswer() // remember how far he got.
-            this.updateUserDb() // has its own chaining
             // return from this on-the-fly function is implied  
           }
         ) // done with .then
-      .catch((e) => {
-        console.log('qtWriteAnswer error. ' +  e)
+      .catch(() => {
+        console.log('qtWriteAnswer error. ')
       })
   } // end writeAnswerToDb
 
-  launchQtReadAnswers = (e) => {
+  launchQtReadAnswers() {
     console.log('running launchQtReadAnswers') 
     api.qtReadAnswers(this.cust, this.qid, this.qUserId)
       .then 
@@ -436,7 +462,7 @@ export class QuestComponent implements OnInit {
         )
         .catch(() => {  // api.qtReadAnswers returned an error 
           console.log('api.qtReadAnswers error. cust & qid & user ' 
-          , this.cust, ' ', this.qid,' ',this.qUserId,' ',
+          , this.cust, ' ', this.qid,' ',this.qUserId,' '
           )
         })
   //================
@@ -490,7 +516,7 @@ export class QuestComponent implements OnInit {
         {
         this.buildScoreFields(i)
         this.scoresArray.push(this.scoreObj) 
-        this.writeScoresToDb(Event)  
+        this.writeScoresToDb()  
         this.accumArray[i].accumStoreDbYn = 'y'
         this.accumArray[i].accumQuestCnt = 0  //reset to zero
       }
@@ -512,7 +538,7 @@ export class QuestComponent implements OnInit {
     }
   }  // end buildScoreFields
 
-  writeScoresToDb(e){
+  writeScoresToDb(){
     console.log('running writeScoresToDb')
     this.msg1 = 'writing scores to database...'
 
@@ -529,32 +555,43 @@ export class QuestComponent implements OnInit {
         // return from this on-the-fly functon is implied  
       }
     )
-  .catch((e) => {
-    console.log('qtWriteScore error. ' +  e)
+  .catch(() => {
+    console.log('qtWriteScore error. ' )
+    console.table(this.scoreObj)
   })
     
   } // end writeScoresToDb
 
-  updateUserDb(){
-    console.log('running updateUserDb')
-    console.log('528')
-    console.table(this.userObj)
+  updateParticipantDb(fromWhere){
+    console.log('running updateParticipantDb')
+    console.log(fromWhere)
+    // console.log('528')
+    // console.table(this.userObj)
     // update one rec on db table qtUser
-    api.qtUpdateUser(this.userObj)
+    console.log('quest 550 qtUpdateParticipant')
+    api.qtUpdateParticipant(this.userObj)
     .then 
     (   (qtDbRtnObj) => 
       {
+        console.log('running .then of api.qtUpdateParticipant')
+        this.wrapUpWaitForPriorDbUpdate = false
+
+        console.table(this.userObj)
         this.qtDbDataObj = qtDbRtnObj.data
         // return from this on-the-fly functon is implied  
       }
     )
-  .catch((e) => {
-    console.log('updateUserDb error. ' +  e)
+  .catch(() => {
+    console.log('559 updateParticipantDb error. ')
+    console.table(this.userObj)
   })
   } // end update User
 
   matchAllQuestionsToAlreadyAnsweredQuestions(){
     console.log('running matchAllQuestionsToAlreadyAnsweredQuestions')
+    console.log('past answers:')
+    console.table(this.pastAnswers)
+
     // allQuestions questNbr
     // pastAnswers questNbr
     // set allQuestions.answeredAlready to 'y'
@@ -563,9 +600,14 @@ export class QuestComponent implements OnInit {
       // find question that matches this pastAnswer, by questNbr
       j = this.allQuestions
           .findIndex(q  => q.questNbr == this.pastAnswers[i].questNbr);
-      console.log(this.pastAnswers[i].questNbr)
-      this.allQuestions[j].answeredAlready = 'y'
+      console.log('pastanswers questNbr: ',this.pastAnswers[i].questNbr)
+      if (j > -1){
+        this.allQuestions[j].answeredAlready = 'y'
+        console.log('question was asked before: ')
+        console.log(this.allQuestions[j].questTxt)
+      }
     } // end for
+    console.log('allQuestions: ')
     console.table(this.allQuestions)
   } // end matchAllQuestionsToAlreadyAnsweredQuestions
 
@@ -629,7 +671,7 @@ export class QuestComponent implements OnInit {
     console.log('activeQuestions.length:',this.activeQuestions.length)
     if (this.activeQuestions.length == 0) {
       this.msg1 = 'This survey is complete. '
-      this.wrapUp()
+      // this.wrapUp() ??running wrapUp elsewhere??
     }
       console.log('done findNextRoundOfActiveQuestions')
   } // end findNextRoundOfActiveQuestions
@@ -638,9 +680,11 @@ export class QuestComponent implements OnInit {
     //
     function compareSeq(a, b) {
       let comparison = 0;
-      if (a.questSeq > b.questSeq) {
+      if (a.questSeq.toString().padStart(4,'0') 
+         > b.questSeq.toString().padStart(4,'0')) {
         comparison = 1;
-      } else if (a.questSeq < b.questSeq) {
+      } else if (a.questSeq.toString().padStart(4,'0') 
+                < b.questSeq.toString().padStart(4,'0')) {
         comparison = -1;
       }
       return comparison;
@@ -662,13 +706,22 @@ export class QuestComponent implements OnInit {
     console.table(this.subsetArray)
     this.msg1 = 'Thank you, ' + this.firstNameInput
     + ', for taking this survey. '
-    this.msg2 = 'This survey was brought to you by the QnC company.  '
-    + 'How was your experience?  Your feedback is appreciated.  '
-    + 'Please email us at feedback@qncCompany.com.'
-    Object.assign(this.userObj,{status:  'done' })
-    this.updateUserDb()  
+    this.msg2 = 'This survey tool was created by flyTechFree company.  '
+    + ' Your feedback is appreciated.  '
+    + 'Please email us at feedback@flyTechFree.com.'
+    // someday maybe:
+    // < a href="mailto:john@example.com">John< /a>
+    //hack to delay final db update: (cuz async update is happening)
+    // while (this.wrapUpWaitForPriorDbUpdate){
+    //   console.log('688 wait'      )
+    // }
+    Object.assign(this.userObj,{status:  "done" })
+    Object.assign(this.userObj,{userDateTime: this.dateTimeNow })
+    Object.assign(this.userObj,{priorQ:  this.answerObj[ "questNbr" ]})
+    this.updateParticipantDb('from wrapUp')   
   } // end wrapUp
 
+  
 /////////////////////////////////////////////////////////////////
 // how duz promise based stuff work? by chaining confusion.
 // The first argument of .then 
@@ -691,16 +744,16 @@ export class QuestComponent implements OnInit {
 //
 ////////////////////////////////////////////////////////////////
 
-  launchQtReadQuestions = (e) => {
+  launchQtReadQuestions () {
     api.qtReadQuestions(this.cust,this.qid)
         .then 
         (   (qtDbRtnObj) => 
           {
-            console.log(' running .then of qtReadQuestions') 
+            console.log(' running .then of api.qtReadQuestions') 
             //this.subset = this.subsetArray[this.sax].subset
             this.loadQuestionsFromDbToAllQuestions(qtDbRtnObj)
             this.buildListOfAccumsFromAllQuestions()
-            this.launchQtReadRules(event) // has its own chaining
+            this.launchQtReadRules() // has its own chaining
             console.table(this.allQuestions)
             this.matchAllQuestionsToAlreadyAnsweredQuestions()
             this.findNextRoundOfActiveQuestions()
@@ -711,12 +764,17 @@ export class QuestComponent implements OnInit {
               this.curPreQuest = this.activeQuestions[0].preQuest
               this.curAca = this.activeQuestions[0].aca
               this.curAcaFrame = this.activeQuestions[0].acaFrame
-
+              if(this.curQuestTxt.includes('\n')) {
+                this.questHasLinBrk = true
+              } else {
+                this.questHasLinBrk = false
+              } // end if includes \n    
             }
           }
         )
-        .catch((e) => {  // api.qtReadQuestions returned an error 
-          console.log('api.qtReadQuestions error.' + e)
+        .catch(() => {  // api.qtReadQuestions returned an error 
+          console.log('api.qtReadQuestions error.' )
+          console.log(this.cust,this.qid)
         })
   }
 
@@ -760,7 +818,7 @@ export class QuestComponent implements OnInit {
     }
   } //end buildListOfAccumsFromAllQuestions
 
-  launchQtReadSubsets = (e) => {
+  launchQtReadSubsets() {
     console.log('running launchQtReadSubsets')
     api.qtReadSubsets(this.cust,this.qid)
         .then 
@@ -768,18 +826,24 @@ export class QuestComponent implements OnInit {
           {
             console.log(' running .then of api.qtReadSubsets') 
             this.buildListOfSubsets(qtDbRtnObj)
-            this.launchQtReadQuestions(Event) // read questions
+            this.launchQtReadQuestions() // read questions
           }
         )
-        .catch((e) => {  // api.qtReadSubsets returned an error 
-          console.log('api.qtReadSubsets error.' + e)
+        .catch(() => {  // api.qtReadSubsets returned an error 
+          console.log('api.qtReadSubsets error.')
+          console.log('cust & qid: ',this.cust,this.qid)
         })
   } //end launchQtReadSubsets
 
   buildListOfSubsets(qtDbObj){
     console.log('running buildListOfSubsets')
-    console.table(this.subsetsFromDb)
-    this.subsetsFromDb.length = 0 //start out with an empty array.
+    this.subsetsFromDb.length = 0  //start out with an empty array.
+    //console.table(this.subsetsFromDb)
+    if (qtDbObj.length == 0){
+      console.log('buildListOfSubsets. no subsets for this cust & qid')
+      console.log(this.cust , this.qid)
+      return
+    }
     for (let i = 0; i < qtDbObj.length; i++) {
       // we are reading as if there are multiple recs from db,
       // but we expect to fetch just one (for this qid), like:
@@ -798,13 +862,15 @@ export class QuestComponent implements OnInit {
       } // end subsetObj
       this.subsetArray.push( this.subsetObj )
     } //end for loop j
+    console.log('824')
+
     this.subsetArray[0].filterInYn = 'y' //billy cheating here main1
     this.subsetArray[0].subsetRound = 1 //billy cheating here main1
     console.log('result of buildListOfSubsets')
     console.table(this.subsetArray)
   }  // end buildListOfSubsets
 
-  launchQtReadRules = (e) => {
+  launchQtReadRules(){
     console.log('running launchQtReadRules')
     api.qtReadRules(this.cust,this.qid)
       .then 
@@ -814,8 +880,9 @@ export class QuestComponent implements OnInit {
             this.buildListOfRules(qtDbRtnObj)
           }
         )
-        .catch((e) => {  // api.qtReadRules returned an error 
-          console.log('api.qtReadRules error.' + e)
+        .catch(() => {  // api.qtReadRules returned an error 
+          console.log('api.qtReadRules error.')
+          console.log(this.cust,this.qid)
         })
 
   } //end launchQtReadRules
@@ -829,6 +896,23 @@ export class QuestComponent implements OnInit {
     console.table(this.rulesArray)
   } // end buildListOfRules
 
+  // applyRulesToAccumsAndSubsets(){
+  //   console.log('running applyRulesToAccumsAndSubsets 488')
+  //   console.table(this.accumArray)
+  //   // two arrays here.  accumArray  rulesArray
+  //   // accumArray[].accumScore is already set.
+  //   // run thru accumArray and set accum.threshHit 'y' 
+  //   // for accums that have hit a rule threshHold.
+  //   for (let i = 0; i < this.accumArray.length; i++) {
+  //     // find this accum in rulesArray to get rulesArray.thresh
+  //     //rules array index:
+  //     let rai = this.rulesArray 
+  //     .map(function(ra) { return ra.accum })
+  //     .indexOf(this.accumArray[i].accum)
+  //     if(rai > -1) { this.checkAccumAgainstRule(rai,i) }
+  //   } // end for loop on accumArray
+  // } // end applyRulesToAccumsAndSubsets
+
   applyRulesToAccumsAndSubsets(){
     console.log('running applyRulesToAccumsAndSubsets 488')
     console.table(this.accumArray)
@@ -839,12 +923,14 @@ export class QuestComponent implements OnInit {
     for (let i = 0; i < this.accumArray.length; i++) {
       // find this accum in rulesArray to get rulesArray.thresh
       //rules array index:
-      let rai = this.rulesArray 
-      .map(function(ra) { return ra.accum })
-      .indexOf(this.accumArray[i].accum)
-      if(rai > -1) { this.checkAccumAgainstRule(rai,i) }
-    } // end for loop on accumArray
-  } // end applyRulesToAccumsAndSubsets
+      for (let j = 0; j < this.rulesArray.length; j++) {
+        if (this.rulesArray[j].accum == this.accumArray[i].accum) {
+          this.checkAccumAgainstRule(j,i)
+        } // end if
+      } // end inner for loop on rulesArray
+    } // end outer for loop on accumArray
+  } // end applyRulesToAccumsAndSubsetssss
+
 
   checkAccumAgainstRule(rai,i){
     console.log('running checkAccumAgainstRule')
@@ -874,6 +960,8 @@ export class QuestComponent implements OnInit {
     if (this.rulesArray[rai].oper == '>'
     &&  this.accumArray[i].accumScore > this.rulesArray[rai].thresh) { 
       this.accumArray[i].accumThreshHit = 'y'
+      // console.log('944 score > thresh ')
+      // console.table(this.rulesArray[rai])
     } //end if oper >
 
     if ( this.accumArray[i].accumThreshHit == 'y') {
@@ -897,32 +985,33 @@ export class QuestComponent implements OnInit {
 
   } // end applyAccumToSubsets
 
-qtReadUser =  (e) => {
-   // qtReadUser = async (e) => {  // dreaded async await?
-   console.log('running qtReadUser')
+qtReadParticipants() {
+   // qtReadParticipants = async (e) => {  // dreaded async await?
+   console.log('running qtReadParticipants')
    api.qtReadUser(this.cust,this.qid,this.qUserId)
-   .then 
+   .then  
       (   (qtDbRtnObj) => 
         {
           console.log(' running .then of api.qtReadUser') 
           this.buildUserObj(qtDbRtnObj)
           this.chkUserStatus()
           this.upsertUser()
-          this.launchQtReadSubsets(Event) // leads to more chaining!
+          this.launchQtReadSubsets() // leads to more chaining!
         }
       )
-      .catch((e) => {  // api.qtReadUser returned an error 
-        console.log('api.qtReadUser error.' + e)
+      .catch(() => {  // api.qtReadUser returned an error 
+        console.log('api.qtReadUser error. key: ' 
+        + this.cust + this.qid + this.qUserId)
       })
-} //end launchQtReadUser
+} //end qtReadParticipants
 
-launchQtWriteUser = (e) => {
-  console.log('running launchQtWriteUser')
-  api.qtWriteUser(this.userObj)
+launchQtAddParticipant() {
+  console.log('running launchQtAddParticipant')
+  api.qtAddParticipant(this.userObj)
     .then 
       (   (qtDbRtnObj) => 
         {
-          console.log(' running .then of api.qtWriteUser') 
+          console.log(' running .then of api.qtAddParticipant') 
           //this.buildUserObj(qtDbRtnObj)
           this.msg1 = 'Starting the survey for ' 
           + this.firstNameInput + ' ' + this.lastNameInput 
@@ -930,15 +1019,17 @@ launchQtWriteUser = (e) => {
           this.showSignHtml = false
         }
       )
-      .catch((e) => {  // api returned an error 
-        console.log('api.qtWriteUser error.' + e)
+      .catch(() => {  // api returned an error 
+        console.log('api.qtAddParticipant error.')
+        console.log(this.userObj)
       })
 
-} //end launchQtWriteUser
+} //end launchQtAddParticipant
 
 
   setDiagnosticsOnOff(){
     //console.log('running setDiagnosticsOnOff')
+    // as of Spring 2021, control diagnostics with ctrl+alt+shift
     if (this.showDiagHtml === true) {
       this.showDiagHtml = false
     }else{
@@ -956,12 +1047,12 @@ launchQtWriteUser = (e) => {
               console.log(' running .then of api.qtMassDeleteAnswers') 
             }
           )
-          .catch((e) => {  // api.qtMassDeleteAnswers returned an error 
+          .catch(() => {  // api.qtMassDeleteAnswers returned an error 
             console.log('api.qtMassDeleteAnswers error.' )
           })
 } // end massDeleteAnswers
 
-massDeleteScores = (e) => {
+massDeleteScores() {
     alert('gonna delete Scores...')
     console.log('running massDeleteScores')
     api.qtMassDeleteScores(this.cust,this.qid)
@@ -971,8 +1062,9 @@ massDeleteScores = (e) => {
             console.log(' running .then of api.qtMassDeleteScores') 
           }
         )
-        .catch((e) => {  // api.qtMassDeleteScores returned an error 
-          console.log('api.qtMassDeleteScores error.' + e)
+        .catch(() => {  // api.qtMassDeleteScores returned an error 
+          console.log('api.qtMassDeleteScores error.')
+          console.log('cust & qid: ' , this.cust,this.qid)
         })
 } // end massDeleteScores
 
