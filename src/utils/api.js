@@ -354,6 +354,41 @@ const qtReadUser = (custParmIn,qidParmIn,userParmIn) => {
     return response.json()
   })
 }
+const qtReadGroups = (custParmIn,qidParmIn) => {
+  let myUrl =  'https://stupefied-elion-621b07.netlify.app/.netlify/functions/qtReadGroups'
+  + '?cust=' + custParmIn
+  + '&qid=' + qidParmIn
+  return fetch(myUrl)
+   .then((response) => {
+    return response.json()
+  })
+}
+
+const qtAddGroup = (data) => {
+  return fetch(`https://stupefied-elion-621b07.netlify.app/.netlify/functions/qtAddGroup`, {
+    body: JSON.stringify(data),
+    method: 'POST'
+  }).then(response => {
+    return response.json()
+  })
+}
+
+const qtUpdateGroup = (data) => {
+  return fetch(`https://stupefied-elion-621b07.netlify.app/.netlify/functions/qtUpdateGroup`, {
+    body: JSON.stringify(data),
+    method: 'POST'
+  }).then(response => {
+    return response.json()
+  })
+}
+const qtDeleteGroup = (data) => {
+  return fetch(`https://stupefied-elion-621b07.netlify.app/.netlify/functions/qtDeleteGroup`, {
+    body: JSON.stringify(data),
+    method: 'POST'
+  }).then(response => {
+    return response.json()
+  })
+}
 
 export default  {
   create: create,
@@ -393,6 +428,12 @@ export default  {
   qtAddParticipant:qtAddParticipant,
   qtUpdateScoreboard: qtUpdateScoreboard,
   qtUpdateParticipant: qtUpdateParticipant,
-  qtDeleteScoreboard: qtDeleteScoreboard
+  qtDeleteScoreboard: qtDeleteScoreboard,
+  qtReadGroups: qtReadGroups,
+  qtAddGroup: qtAddGroup,
+  qtUpdateGroup: qtUpdateGroup,
+  qtDeleteGroup: qtDeleteGroup
+
+
 }
 

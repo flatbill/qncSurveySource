@@ -1,6 +1,5 @@
 import { HostListener, Component, OnInit } from '@angular/core'
 import api from 'src/utils/api'
-
 @Component({
   selector: 'app-quest',
   templateUrl: './quest.component.html'
@@ -67,11 +66,10 @@ export class QuestComponent implements OnInit {
   showDiagButHtml = false  // turn on with ctrl shift alt
   wrapUpWaitForPriorDbUpdate = false
   questHasLinBrk = false // questions with line breaks hit different html
-
-  //billy, maybe create question rec layout, like dateCodeCatalog.
-  // right now, questions just follow the db rec layout.
-  // is that good enuff, or will it be confusing later?
-  // maybe related to 
+  groupArray = []
+  participantObj = new Object
+  pastScores = []
+  
   // https://forums.fauna.com/t/multi-document-upsert/488
   // maybe we want a consistent rec layout for the fauna db & here.
   // we have xxxObj in this pgm for the various arrays & db.
@@ -82,6 +80,7 @@ export class QuestComponent implements OnInit {
   // maybe read into xxxObj first, cuz xxxObj has the rec layout.
   // in case of mismatch between fauna and this pgm,
   // we will have errors, but maybe they will be less weird.
+  // Nov 2021 we seem to be getting by just fine without a rec type.
   //
   // may 2021. figure out date time for all db files.
   // as of may 2021, we set answers and scores with 00:00 time.
@@ -91,22 +90,17 @@ export class QuestComponent implements OnInit {
   // when done building allQuestions array,
   // and done building pastAnswers array,
   // and before asking any questions,
-  // mark those recs in allQuestions array that have been answered already.
+  // we mark those recs in allQuestions array 
+  // that have been answered already.
   // later, when choosing a smaller set of questions,
   // further filter by only those questions no-yet-answered.
 
-  ngOnInit(): void {
+  ngOnInit() {
     this.setQueryStringParms()
-    // may 2021 selzer. lauchQtReadSubsets after signon.
-    //this.launchQtReadSubsets(Event) //fetch subsets from db
-    // that chains launchQtReadQuestions (questions)
-    //       that chains launchQtReadRules (rules) 
-    // cuz of promise-oriented fauna, dont fetch more db data here.
-    // someday chain the asyn events in an organized way.
-    // as of Nov2020 see chain-ish stuff in .then of launch paras.
   } // end ngOnInit
   
   setQueryStringParms(){
+    console.log('running setQueryStringParms')
     let locSearchResult = new URLSearchParams(location.search)
     let locSearchResultCust  = locSearchResult.get('cust')
     let locSearchResultQid   = locSearchResult.get('qid')
@@ -124,11 +118,11 @@ export class QuestComponent implements OnInit {
     if(this.cust == '?'){this.cust = '1'}
     if(this.qid == '?'){this.qid = '666'}
     if(this.icode == '?'){this.icode = '90210'}
-    console.log ( 'done setQueryStringParms.' 
-    + ' cust: ' + this.cust
-    + ' qid: '  + this.qid
-    + ' icode: '+ this.icode )
-  }
+    // console.log ( 'done setQueryStringParms.' 
+    // + ' cust: ' + this.cust
+    // + ' qid: '  + this.qid
+    // + ' icode: '+ this.icode )
+  } // end setQueryStringParms
 
   ctrlShiftAltWasHit(){
     console.log('running ctrlShiftAltWasHit')
@@ -140,17 +134,17 @@ export class QuestComponent implements OnInit {
     }
   } // end ctrlShiftAltWasHit
 
-  doSign(){ // user clicked go onscreen
+  doSign(){ // user clicked go button onscreen
     console.log('running doSign')
     this.validateSignOn()
     if (this.msg1 == 'ok') {
       // db function chaining, see .then
       // readuser > readsubsets > readquestions
       this.msg1 =  "let's look you up, " + this.firstNameInput + ' ...'
-      this.qtReadParticipants() 
+      this.qtReadParticipant() 
       // pgm will continue in .then of qtReadParticipants
     }
-  }
+  } // end doSign
 
   validateSignOn(){
     this.msg1 = ''
@@ -171,25 +165,25 @@ export class QuestComponent implements OnInit {
    //   ev.target.value[0].toUpperCase() + ev.target.value.substring(1)
    this.firstNameInput = 
      firstNameParmIn[0].toUpperCase() + firstNameParmIn.substring(1)
-  }
+  } // end firstNameChg
 
   lastNameChg(lastNameParmIn){
     // this.lastNameInput = 
     //   ev.target.value[0].toUpperCase() + ev.target.value.substring(1)
     this.lastNameInput = 
       lastNameParmIn[0].toUpperCase() + lastNameParmIn.substring(1)
-  }
+  } // end lastNameChg
 
   phoneChg(phoneParmIn){
     // this.phoneInput = ev.target.value 
     this.phoneInput = phoneParmIn 
-  }
+  } // end phoneChg
 
   buildUserObj(dbUserObj){
-    console.log('dbUserObj:')
+    console.log('running buildUserObj dbUserObj:')
     console.table(dbUserObj)
     if (dbUserObj.length > 0){
-      console.log('user is found in db')
+      // console.log('user is found in db')
       this.msg1 = 'welcome back, ' + this.firstNameInput + '.'
       this.userFoundInDb = true
       this.userObj =
@@ -206,8 +200,8 @@ export class QuestComponent implements OnInit {
       }
     }
 
-    if (dbUserObj.length ==0){
-      console.log('user not found in db')
+    if (dbUserObj.length == 0){
+      // console.log('user not found in db')
       this.userFoundInDb = false
       this.userObj =
       {
@@ -221,43 +215,12 @@ export class QuestComponent implements OnInit {
         "status": "active",
         "priorQ": "0"
       }
-      console.table(this.userObj)
+      // console.table(this.userObj)
     }
 
-    // billy, if returning user,
-    // re-position an exising user that is continuing.
-    // maybe somewhere, create a shrunken down list of questions,
-    // to only those questions that were NOT asked already.
-    console.log('229 is he a returning user?')
-    console.table(this.userObj)
+    // console.log('219 is he a returning user?')
+    // console.table(this.userObj)
   } // end buildUserObj
-
-  chkUserStatus(){
-    console.log('running chkUserStatus')
-    // is the user signing on, but has completed the survey already?
-    // is the user returning after partial completion?
-    // can we shrink the remaining question list ?
-    // hey what about subsets? 
-    //  
-    // if previously partially-completed, match his prior answers
-    // to the question list.
-    // delete from question list if he answered already.
-    //
-    // a different complicated topic: what about a return user,
-    // that is taking the survey AGAIN?
-    // if he is purposely taking the survey again,
-    // then we should make him say so:
-    // dear john smith, you already completed this survey.
-    // would you like to start again?
-    // if YES, then take his old user rec, and flag it as INACTIVE.
-    // then insert a new user rec.
-    // john smith  1111 May13 INACTIVE
-    // john smith  1111 May14 ACTIVE
-    // as of Oct 2021, expect repeat participant to use a different name.
-    if (this.userFoundInDb &&  this.userObj[ "priorQ" ] > 0) {
-      this.launchQtReadAnswers() // find past answers. has chaining.
-    }
-  } // end chkUserStatus
 
   setPastAnswers(answersFromDb){
     console.log('running setPastAnswers')
@@ -266,11 +229,8 @@ export class QuestComponent implements OnInit {
     // console.table(answersFromDb)
     // console.table(answersFromDb[0].data)
     for (let i = 0; i < answersFromDb.length; i++) {
-      // console.log('238')
       this.pastAnswers.push(answersFromDb[i].data)
-      // console.log(this.pastAnswers[i])
     } // end for loop
-   //console.log(answersFromDb.data.length)
   } // end setPastAnswers
 
   upsertUser(){
@@ -288,75 +248,50 @@ export class QuestComponent implements OnInit {
     }
   }  // end upsertUser
 
-  // setUserFieldsAfterAnswer() {
-  //   console.log('running setUserFieldsAfterAnswer')
-  //   // he answered a question. lets remember how far he got.
-  //   // set user info into userObj for some user attributes
-  //   // bizzarre bracket notation -- this.myObj[ "foo" ]  typescript sucks.
-  //   Object.assign(this.userObj,{userDateTime: this.dateTimeNow })
-  //   Object.assign(this.userObj,{status:  'active' })
-  //   Object.assign(this.userObj,{priorQ:  this.answerObj[ "questNbr" ]})
-  //   //alert(this.answerObj[ "questNbr" ])
-  //   //console.table(this.userObj)
-  // } // end setUserFieldsAfterAnswer
-
   answerClicked(hisAnsAcaIxFromHtml) {
     console.log('running answerClicked')
     // called from html, he clicked an answer
     this.calcAnswerTimeGap()
     this.storeAnswer(hisAnsAcaIxFromHtml)  
     if (this.aqx < this.activeQuestions.length - 1) { 
-      //console.log('ready to ask another question')
+      // console.log('ready to ask another question:')
+      // console.log(this.activeQuestions[this.aqx].questTxt)
       this.aqx = this.aqx + 1
       this.curQuestTxt = this.activeQuestions[this.aqx].questTxt
       this.curPreQuest = this.activeQuestions[this.aqx].preQuest 
       this.curAca = this.activeQuestions[this.aqx].aca 
       this.curAcaFrame = this.activeQuestions[this.aqx].acaFrame
-      if(this.curQuestTxt.includes('\n')) {
+      if (this.curQuestTxt.includes('\n')) {
         this.questHasLinBrk = true
       } else {
         this.questHasLinBrk = false
       } // end if includes \n
     } else { //we are at the end of active questions
-        console.log('306 we are at the end of a subset ')
-        this.closeOutActiveAndPrepNextQuestions()
-        if (this.activeQuestions.length > 0) {  //we have more questions
-          this.aqx = 0
-          this.curPreQuest = this.activeQuestions[0].preQuest
-          this.curQuestTxt = this.activeQuestions[0].questTxt
-          this.curAca = this.activeQuestions[0].aca
-          this.curAcaFrame = this.activeQuestions[0].acaFrame
-          if(this.curQuestTxt.includes('\n')) {
-            this.questHasLinBrk = true
-          } else {
-            this.questHasLinBrk = false
-          } // end if includes \n
-        } else {
-          console.log('running answerClicked 321, gonna wrapUp')
+        // set next groups and set next round of active questions:
+        this.closeOutActiveAndPrepNextQuestions()  
+        this.aqx = 0
+        if (this.activeQuestions.length == 0) {
           this.wrapUp() //we are done with qNa. 
-        } // end if activeQuest length >0
+        }
     } // end if this.aqx
   } // end answerClicked
 
   closeOutActiveAndPrepNextQuestions(){
     console.log('running closeOutActiveAndPrepNextQuestions')
-    for (let i = 0; i < this.subsetArray.length; i++) {
-      if (this.subsetArray[i].ssStatusQnA == 'active') {
-          // console.log('143 setting status to done for subset:')
-        console.log( 'subset: ',this.subsetArray[i].subset)
-        this.subsetArray[i].ssStatusQnA = 'done'
-      }
-    }
+
+    for (let i = 0; i < this.groupArray.length; i++) {
+      if (this.groupArray[i].statusQnA == 'active') {
+        this.groupArray[i]['statusQnA'] = 'done'
+        // console.log('354 setting group status to done')
+      } // end if
+    } // end for
+
     this.calcScores()
     this.storeScores()
-    this.applyRulesToAccumsAndSubsets() // set accumThreshHit to y or n  
+    this.compareRulesScoresGroups()
     this.findNextRoundOfActiveQuestions()
     this.sortRoundOfActiveQuestions()
-
-    this.curQuestTxt = ''
-    this.curPreQuest = ''
-    this.curAca = []
-    this.curAcaFrame = []
+    this.setFirstActiveQuest()
   } // end closeOutActiveAndPrepNextQuestions
 
   calcAnswerTimeGap(){
@@ -385,11 +320,6 @@ export class QuestComponent implements OnInit {
     this.buildAnswerFields()
     this.answerArray.push(this.answerObj)
     this.writeAnswerToDb() //has its own chaining  .then
-    // billy ya might want to
-    // first, look for an existing answer in the db and replace it.
-    // if no existing answer, then insert one.
-    // look in fauna forums for upsert.  
-
   } //end storeAnswer
 
   buildAnswerFields(){
@@ -406,7 +336,7 @@ export class QuestComponent implements OnInit {
       "timeGap": this.timeGap,
       "accum" : this.activeQuestions[this.aqx].accum,  
       "scoreRound" : 0
-    }
+    } // end answerObj
         // when building an answer rec, we copy-in the accum array 
         // from the question to help later with scoring.
         // we are NOT adding to answers.accum here,
@@ -449,7 +379,7 @@ export class QuestComponent implements OnInit {
       })
   } // end writeAnswerToDb
 
-  launchQtReadAnswers() {
+  launchQtReadPastAnswers() {
     console.log('running launchQtReadAnswers') 
     api.qtReadAnswers(this.cust, this.qid, this.qUserId)
       .then 
@@ -458,6 +388,7 @@ export class QuestComponent implements OnInit {
             console.log(' running .then of api.qtReadAnswers') 
             //keep past answers in an array, for comparison later.
             this.setPastAnswers(qtDbRtnObj)
+            this.launchQtReadPastScores() // leads to more chaining!
           }
         )
         .catch(() => {  // api.qtReadAnswers returned an error 
@@ -465,9 +396,49 @@ export class QuestComponent implements OnInit {
           , this.cust, ' ', this.qid,' ',this.qUserId,' '
           )
         })
-  //================
   } //end launchQtReadAnswers
   
+  launchQtReadPastScores() {
+    console.log('running launchQtReadPastScores') 
+    api.qtReadScores(this.cust, this.qid, this.qUserId)
+      .then 
+        (   (qtDbRtnObj) => 
+          {
+            console.log(' running .then of api.qtReadScores') 
+            //keep past scores in an array, for comparison later.
+            this.setPastScores(qtDbRtnObj)
+            this.setPastScoresIntoScores()
+            this.launchQtReadGroups() // leads to more chaining!
+          }
+        )
+        .catch(() => {  // api.qtReadAnswers returned an error 
+          console.log('api.qtReadScores error. cust & qid & user ' 
+          , this.cust, ' ', this.qid,' ',this.qUserId,' '
+          )
+        })
+  } //end launchQtReadPastScores
+
+  setPastScores(scoresFromDb){
+    console.log('running setPastScores')
+    // get here after reading scores for this user, for a prior session.
+    // set db records into pastScores array.
+    for (let i = 0; i < scoresFromDb.length; i++) {
+      this.pastScores.push(scoresFromDb[i].data)
+    } // end for loop
+  } // end setPastScores
+
+  setPastScoresIntoScores(){
+    console.log('running setPastScoresIntoScores ')
+    // he is a returning participant 
+    // that may have been partially scored already.
+    //if (this.pastScores.length() > 0){ 
+      // stuff pastScores into scoresArray,
+      // pretending he got scored in this session.
+      this.scoresArray = this.pastScores
+      // console.table(this.scoresArray)
+    //}//
+  }
+
   calcScores(){
     console.log('running calcScores')
     // exit this paragrf with nice values in accumArray.
@@ -481,17 +452,18 @@ export class QuestComponent implements OnInit {
       // and set answerArray.scoreRound = to this round
       for (let i = 0; i < this.answerArray.length; i++) {
         for (let j = 0; j < this.answerArray[i].accum.length; j++) {
-          console.log('458 looping j:',j)
           if (this.answerArray[i].scoreRound == 0) { //not scored yet
             this.findAccumAndAddPoints(this.answerArray[i].accum[j],
                                       this.answerArray[i].answerPoints,
                                       this.answerArray[i].timeGap)
-            // billy, u r here, need multiple scores cuz multiple accums?
-            // this.answerArray[i].scoreRound  = this.scoreRound jun2021
-          }
-        }
+            // console.log('486 answerArray[i].accum[j]:')
+            // console.table(this.answerArray[i].accum[j])
+            // tests OK for multiple accums, 
+            // cuz we add a scores rec for each accum.
+          } // end if
+        } //end inner for
         this.answerArray[i].scoreRound  = this.scoreRound
-      } // end answerArray Loop
+      } // end answerArray outer for
       this.scoreRound = this.scoreRound + 1 
   } // end calcScores
 
@@ -508,7 +480,7 @@ export class QuestComponent implements OnInit {
   } // end findAccumAndAddPoints
 
   storeScores(){
-    console.log('ready to store scores. accumArray:')
+    console.log('running storeScores')
     // for each row in accumArray,  buildScore & writeScore
     for (let i = 0; i < this.accumArray.length; i++) {
       if (this.accumArray[i].accumStoreDbYn == 'n'
@@ -524,6 +496,7 @@ export class QuestComponent implements OnInit {
   } // end storeScores
 
   buildScoreFields(i){
+    console.log('524 running buildScoreFields')
     this.scoreObj = 
     {
       'cust': this.cust,
@@ -536,6 +509,7 @@ export class QuestComponent implements OnInit {
       'questCnt' : this.accumArray[i].accumQuestCnt,
       'timeGap' : this.accumArray[i].accumTimeGap,
     }
+    //console.table(this.scoreObj)
   }  // end buildScoreFields
 
   writeScoresToDb(){
@@ -563,12 +537,10 @@ export class QuestComponent implements OnInit {
   } // end writeScoresToDb
 
   updateParticipantDb(fromWhere){
-    console.log('running updateParticipantDb')
-    console.log(fromWhere)
-    // console.log('528')
-    // console.table(this.userObj)
+    console.log('running updateParticipantDb from '+ fromWhere)
+    // console.log(fromWhere)
     // update one rec on db table qtUser
-    console.log('quest 550 qtUpdateParticipant')
+    // console.log('quest 565 qtUpdateParticipant')
     api.qtUpdateParticipant(this.userObj)
     .then 
     (   (qtDbRtnObj) => 
@@ -576,108 +548,99 @@ export class QuestComponent implements OnInit {
         console.log('running .then of api.qtUpdateParticipant')
         this.wrapUpWaitForPriorDbUpdate = false
 
-        console.table(this.userObj)
+        // console.table(this.userObj)
         this.qtDbDataObj = qtDbRtnObj.data
-        // return from this on-the-fly functon is implied  
+        // return from this on-the-fly function is implied  
       }
     )
   .catch(() => {
-    console.log('559 updateParticipantDb error. ')
+    console.log('557 updateParticipantDb error. userObj: ')
     console.table(this.userObj)
   })
-  } // end update User
+  } // end updateParticipantDb
 
   matchAllQuestionsToAlreadyAnsweredQuestions(){
     console.log('running matchAllQuestionsToAlreadyAnsweredQuestions')
-    console.log('past answers:')
-    console.table(this.pastAnswers)
-
+    // console.log('past answers:')
+    // console.table(this.pastAnswers)
     // allQuestions questNbr
     // pastAnswers questNbr
-    // set allQuestions.answeredAlready to 'y'
+    // if ya find a match: set allQuestions.answeredAlready to 'y'
     let j = 0
     for (let i = 0; i < this.pastAnswers.length; i++) {
       // find question that matches this pastAnswer, by questNbr
       j = this.allQuestions
           .findIndex(q  => q.questNbr == this.pastAnswers[i].questNbr);
-      console.log('pastanswers questNbr: ',this.pastAnswers[i].questNbr)
+      // console.log('pastanswers questNbr: ',this.pastAnswers[i].questNbr)
       if (j > -1){
         this.allQuestions[j].answeredAlready = 'y'
-        console.log('question was asked before: ')
-        console.log(this.allQuestions[j].questTxt)
+        // console.log('question was asked before: ')
+        // console.log(this.allQuestions[j].questTxt)
       }
     } // end for
-    console.log('allQuestions: ')
-    console.table(this.allQuestions)
+    // console.log('allQuestions: ')
+    // console.table(this.allQuestions)
   } // end matchAllQuestionsToAlreadyAnsweredQuestions
 
   findNextRoundOfActiveQuestions(){
     console.log('running findNextRoundOfActiveQuestions')
-    let nextMainSubset = '?'
-    this.activeQuestions.length = 0  // resetting to zero for next subset
-    this.subsetRound = this.subsetRound + 1
-    //find the next bunch of subsets (those with rules) to ask
-    this.subsetTempArray = []
-    for (let i = 0; i < this.subsetArray.length; i++) {
-      if (this.subsetArray[i].filterInYn == 'y' 
-      &&  this.subsetArray[i].ssStatusQnA == 'pending') {
-        this.subsetArray[i].subsetRound = this.subsetRound
-        this.subsetTempArray.push(this.subsetArray[i].subset)
-        this.subsetArray[i].ssStatusQnA = 'active'
-      }
-    }  // end for loop subsetArray
+    this.activeQuestions.length = 0  // start fresh for the upcoming round
+    // console.log('723 groupArray:')
+    // console.table(this.groupArray)
+    // part a:
+    // look thru groupArray for the first group seq not yet asked.
+    // group seq is a grouper-of-groups.
+    // use this group seq as a driver for the next set of groups.
+    // i mean, flag all groups (with this seq) in groupArray
+    //  with status 'active'.
+    // part b:
+    // then find questions that are in one of these newly active groups.
+    // these are the questions we want stuffed into activeQuestions.
 
-    // clever way to pass subsetTempVarArray into .filter  (comma!)
-    let subsetTempVarArray = this.subsetTempArray,
-    tempActiveQuestions = this.allQuestions.filter(function(q) {
-      // May2021 further restrict the filter to not-yet-answered questions
-      return subsetTempVarArray.includes(q.subset) && q.answeredAlready == 'n'
-    })
-    this.activeQuestions = tempActiveQuestions
-
-    if (this.activeQuestions.length == 0){
-      // we have not triggered any follow On subsets, 
-      // or we are done with those, for now. time to move on and
-      // find a not-yet-asked subset (like main2)
-      // we are looking for subsets without conditional rules.
-      // these type of subsets are always asked.
-      for (let i = 0; i < this.subsetArray.length; i++) {
-        if (this.subsetArray[i].ssStatusQnA == 'pending') {
-          let rai =
-          this.rulesArray.findIndex(obj => obj.subset === this.subsetArray[i].subset)
-          if (rai == -1) { //subset has no rule.  lets turn it on.
-            // console.log(this.subsetArray[i].subset)
-            if (nextMainSubset == '?') {
-              // console.log(' we hit the next main subset.')
-              nextMainSubset = this.subsetArray[i].subset
-              this.subsetArray[i].ssStatusQnA = 'active'
-              this.subsetArray[i].filterInYn = 'y'
-            } // end if nextMainSubset
-          } // end if rai -1 subset has no rule. (like a mainX subset)
-        } // end if status == pending
-      }  //end for subsetArray loop
-    } // end if this.activeQuestions.length == 0
-    
-    if (nextMainSubset != '?')  {
-      console.log('nextMainSubset hit:',nextMainSubset)
-      //we need to set active questions
-      // to the first subset that has no conditional rule:
-      let temp2ActiveQuestions = 
-        this.allQuestions.filter(function(q) {
-          return  q.subset == nextMainSubset
-      })
-      this.activeQuestions = temp2ActiveQuestions       
-    } // end if nextMainSubset != '?'
-    console.log('activeQuestions.length:',this.activeQuestions.length)
-    if (this.activeQuestions.length == 0) {
-      this.msg1 = 'This survey is complete. '
-      // this.wrapUp() ??running wrapUp elsewhere??
+    let gax = -1
+    gax = this.groupArray
+    .findIndex(g  => g.statusQnA == 'pending' && g.threshHit == 'y')
+    // console.log('626 gax: ', gax)
+    let myGroupSeq = '9999'
+    if (gax > -1) {
+      myGroupSeq = this.groupArray[gax].seq.toLowerCase()
+      // console.log('630 myGroupSeq: '+myGroupSeq)
     }
-      console.log('done findNextRoundOfActiveQuestions')
+    for (let i = 0; i < this.groupArray.length; i++) {
+      if (this.groupArray[i].seq.toLowerCase() == myGroupSeq 
+      && this.groupArray[i].threshHit == 'y'
+      && this.groupArray[i].statusQnA == 'pending') {
+        this.groupArray[i]['statusQnA'] = 'active'
+        // console.log('637 activating groupArray: ')
+        // console.table(this.groupArray)
+      } // end for 
+    }
+    let activeGroups = []
+    for (let i = 0; i < this.groupArray.length; i++) {
+      if (this.groupArray[i].statusQnA == 'active') {
+        // console.log('644 pushing into activeGroups: ', this.groupArray[i].groupName)
+        activeGroups.push(this.groupArray[i].groupName.toLowerCase())
+      } //end if
+    }  //end for
+    // part b:  stuff into activeQuestions
+    // console.log('649 part b, check all questions')
+    // console.table(this.allQuestions)
+    for (let i = 0; i < this.allQuestions.length; i++) {
+      // console.log('652 checking a question against activeGroups')
+      // console.log(this.allQuestions[i].subset)
+      if (activeGroups.includes(this.allQuestions[i].subset.toLowerCase())) {
+        if ( this.allQuestions[i].answeredAlready == 'n') {
+          // console.log('656 pushing into allQuestions')
+          this.activeQuestions.push(this.allQuestions[i])
+        } // end if
+      } // end if
+    }  //end for
+    // console.log('655 next round of active questions:')
+    // console.table(this.activeQuestions)
   } // end findNextRoundOfActiveQuestions
 
   sortRoundOfActiveQuestions(){
-    //
+    console.log('running sortRoundOfActiveQuestions')
     function compareSeq(a, b) {
       let comparison = 0;
       if (a.questSeq.toString().padStart(4,'0') 
@@ -686,12 +649,33 @@ export class QuestComponent implements OnInit {
       } else if (a.questSeq.toString().padStart(4,'0') 
                 < b.questSeq.toString().padStart(4,'0')) {
         comparison = -1;
-      }
+      } // end else if
       return comparison;
     } // end function compareSeq
-    
-    this.activeQuestions.sort(compareSeq);
+    this.activeQuestions.sort(compareSeq)
+    //console.table(this.activeQuestions)
   }  // end sortRoundOfActiveQuestions
+
+  setFirstActiveQuest(){
+    console.log('running setFirstActiveQuest')
+    this.curQuestTxt = ''
+    this.curPreQuest = ''
+    this.curAca = []
+    this.curAcaFrame = []
+    if (this.activeQuestions.length > 0) {
+      this.curQuestTxt = this.activeQuestions[0].questTxt
+      this.curPreQuest = this.activeQuestions[0].preQuest
+      this.curAca = this.activeQuestions[0].aca
+      this.curAcaFrame = this.activeQuestions[0].acaFrame
+      if(this.curQuestTxt.includes('\n')) {
+        this.questHasLinBrk = true
+      } else {
+        this.questHasLinBrk = false
+      } // end if includes \n    
+    }
+    if (this.activeQuestions.length == 0) // no questions
+      this.wrapUp()
+  }
 
   wrapUp(){
     console.log('running wrapUp')
@@ -711,18 +695,14 @@ export class QuestComponent implements OnInit {
     + 'Please email us at feedback@flyTechFree.com.'
     // someday maybe:
     // < a href="mailto:john@example.com">John< /a>
-    //hack to delay final db update: (cuz async update is happening)
-    // while (this.wrapUpWaitForPriorDbUpdate){
-    //   console.log('688 wait'      )
-    // }
-    Object.assign(this.userObj,{status:  "done" })
-    Object.assign(this.userObj,{userDateTime: this.dateTimeNow })
-    Object.assign(this.userObj,{priorQ:  this.answerObj[ "questNbr" ]})
-    this.updateParticipantDb('from wrapUp')   
+    if (this.userObj['status'] != 'done') {
+      this.userObj['status']       = 'done'
+      this.userObj['userDateTime'] = this.dateTimeNow 
+      this.userObj['priorQ']       = this.answerObj[ "questNbr" ]
+      this.updateParticipantDb('from wrapUp')
+    }
   } // end wrapUp
-
   
-/////////////////////////////////////////////////////////////////
 // how duz promise based stuff work? by chaining confusion.
 // The first argument of .then 
 // is a function that runs when the promise is resolved, 
@@ -740,8 +720,6 @@ export class QuestComponent implements OnInit {
 // we cant do the wrap up until the last answer is stored.
 // ( cuz it makes the screen messages out-of-order)
 // ( cuz it wrecks the final write to user db table)
-//
-//
 ////////////////////////////////////////////////////////////////
 
   launchQtReadQuestions () {
@@ -750,26 +728,23 @@ export class QuestComponent implements OnInit {
         (   (qtDbRtnObj) => 
           {
             console.log(' running .then of api.qtReadQuestions') 
-            //this.subset = this.subsetArray[this.sax].subset
             this.loadQuestionsFromDbToAllQuestions(qtDbRtnObj)
+            // console.log('750 all questions:')
+            // console.table(this.allQuestions)
             this.buildListOfAccumsFromAllQuestions()
-            this.launchQtReadRules() // has its own chaining
-            console.table(this.allQuestions)
             this.matchAllQuestionsToAlreadyAnsweredQuestions()
-            this.findNextRoundOfActiveQuestions()
-            this.sortRoundOfActiveQuestions()
-
-            if (this.activeQuestions.length > 0) {
-              this.curQuestTxt = this.activeQuestions[0].questTxt
-              this.curPreQuest = this.activeQuestions[0].preQuest
-              this.curAca = this.activeQuestions[0].aca
-              this.curAcaFrame = this.activeQuestions[0].acaFrame
-              if(this.curQuestTxt.includes('\n')) {
-                this.questHasLinBrk = true
-              } else {
-                this.questHasLinBrk = false
-              } // end if includes \n    
-            }
+            this.launchQtReadRules() // has its own chaining
+            // if (this.activeQuestions.length > 0) {
+            //   this.curQuestTxt = this.activeQuestions[0].questTxt
+            //   this.curPreQuest = this.activeQuestions[0].preQuest
+            //   this.curAca = this.activeQuestions[0].aca
+            //   this.curAcaFrame = this.activeQuestions[0].acaFrame
+            //   if(this.curQuestTxt.includes('\n')) {
+            //     this.questHasLinBrk = true
+            //   } else {
+            //     this.questHasLinBrk = false
+            //   } // end if includes \n    
+            // }
           }
         )
         .catch(() => {  // api.qtReadQuestions returned an error 
@@ -779,17 +754,20 @@ export class QuestComponent implements OnInit {
   }
 
   loadQuestionsFromDbToAllQuestions(qtDbObj){
-    //console.log('running loadQuestionsFromDbToAllQuestions')
+    console.log('running loadQuestionsFromDbToAllQuestions')
     // input is qtDbObj from database and output allQuestions array.
     // get here after .then of reading db,
     // so qtDbObj is ready to use.
     this.allQuestions.length = 0 //blank out array, then load it
     for (let i = 0; i < qtDbObj.length; i++) {
       this.allQuestions.push(qtDbObj[i].data)
-      // console.log('questSeq:', this.allQuestions[i].questSeq)
       this.allQuestions[i].answeredAlready = 'n'
+      // this.allQuestions[i].subset = this.allQuestions[i].subset.toLowerCase()
+      for(let j=0; j<this.allQuestions[i].accum.length; j++){
+        // this.allQuestions[i].accum[j] = this.allQuestions[i].accum[j].toLowerCase()
+      } // end inner for
       console.table(this.allQuestions[i])
-    }
+    } // end outer for
   }  // end loadQuestionsFromDbToAllQuestions
 
   buildListOfAccumsFromAllQuestions(){
@@ -814,18 +792,19 @@ export class QuestComponent implements OnInit {
             }
           this.accumArray.push(this.accumObj)
         }
-      }
-    }
+      } // end inner for
+    } // end outer for
   } //end buildListOfAccumsFromAllQuestions
 
-  launchQtReadSubsets() {
-    console.log('running launchQtReadSubsets')
-    api.qtReadSubsets(this.cust,this.qid)
+  launchQtReadGroups() {
+    console.log('running launchQtReadGroups')
+    api.qtReadGroups(this.cust,this.qid)
         .then 
         (   (qtDbRtnObj) => 
           {
-            console.log(' running .then of api.qtReadSubsets') 
-            this.buildListOfSubsets(qtDbRtnObj)
+            console.log(' running .then of api.qtReadGroups') 
+            this.buildListOfGroups(qtDbRtnObj)
+            this.sortListOfGroups()
             this.launchQtReadQuestions() // read questions
           }
         )
@@ -833,42 +812,42 @@ export class QuestComponent implements OnInit {
           console.log('api.qtReadSubsets error.')
           console.log('cust & qid: ',this.cust,this.qid)
         })
-  } //end launchQtReadSubsets
+  } //end launchQtReadGroups
 
-  buildListOfSubsets(qtDbObj){
-    console.log('running buildListOfSubsets')
-    this.subsetsFromDb.length = 0  //start out with an empty array.
-    //console.table(this.subsetsFromDb)
+  buildListOfGroups(qtDbObj){
+    console.log('running buildListOfGroups')
+    this.groupArray.length = 0  //start out with an empty array.
     if (qtDbObj.length == 0){
-      console.log('buildListOfSubsets. no subsets for this cust & qid')
-      console.log(this.cust , this.qid)
+      // console.log('buildListOfGroups. no groups for this cust & qid')
+      // console.log(this.cust , this.qid)
       return
     }
     for (let i = 0; i < qtDbObj.length; i++) {
-      // we are reading as if there are multiple recs from db,
-      // but we expect to fetch just one (for this qid), like:
-      // {
-      //   qid: "1",
-      //   subsets: ["main1", "parakeet2", "parakeet3", "doggySet"]
-      // }
-      this.subsetsFromDb.push(qtDbObj[i].data)
+      this.groupArray.push(qtDbObj[i].data)
     }
-    for (let j = 0; j < this.subsetsFromDb[0].subsets.length; j++) {
-      this.subsetObj = {
-        'subset' : this.subsetsFromDb[0].subsets[j],
-        'filterInYn' : 'n', // variably overwritten below
-        'ssStatusQnA' : 'pending',
-        'subsetRound' : 0
-      } // end subsetObj
-      this.subsetArray.push( this.subsetObj )
+    for (let j = 0; j < this.groupArray.length; j++) {
+      this.groupArray[j][ "statusQnA" ] = 'pending'
+      this.groupArray[j][ "threshHit" ] = 'n'
+      // this.groupArray[j][ "groupName" ] = this.groupArray[j].groupName.toLowerCase()
     } //end for loop j
-    console.log('824')
+  }  // end buildListOfGroups
 
-    this.subsetArray[0].filterInYn = 'y' //billy cheating here main1
-    this.subsetArray[0].subsetRound = 1 //billy cheating here main1
-    console.log('result of buildListOfSubsets')
-    console.table(this.subsetArray)
-  }  // end buildListOfSubsets
+  sortListOfGroups(){
+    console.log('running sortListOfGroups')
+    function compareSeq(a, b) {
+      let comparison = 0;
+      if (a.seq.toString().padStart(4,'0') 
+         > b.seq.toString().padStart(4,'0')) {
+        comparison = 1;
+      } else if (a.seq.toString().padStart(4,'0') 
+                < b.seq.toString().padStart(4,'0')) {
+        comparison = -1;
+      }
+      return comparison;
+    } // end function compareSeq
+    
+    this.groupArray.sort(compareSeq);
+  } // end sortListOfGroups
 
   launchQtReadRules(){
     console.log('running launchQtReadRules')
@@ -878,6 +857,10 @@ export class QuestComponent implements OnInit {
           {
             console.log(' running .then of api.qtReadRules') 
             this.buildListOfRules(qtDbRtnObj)
+            this.findGroupsWithNoRules()
+            this.findNextRoundOfActiveQuestions()
+            this.sortRoundOfActiveQuestions()
+            this.setFirstActiveQuest()
           }
         )
         .catch(() => {  // api.qtReadRules returned an error 
@@ -892,120 +875,143 @@ export class QuestComponent implements OnInit {
     for (let i = 0; i < qtDbObj.length; i++) {
       this.rulesArray.push(qtDbObj[i].data)
     }
-    console.log('804 I built these rules:')
-    console.table(this.rulesArray)
+    for (let i=0;i<this.rulesArray.length; i++){
+      // this.rulesArray[i].accum = this.rulesArray[i].accum.toLowerCase()
+      // this.rulesArray[i].subset = this.rulesArray[i].subset.toLowerCase()
+    }
+    // console.log('893 I built these rules:')
+    // console.table(this.rulesArray)
   } // end buildListOfRules
 
-  // applyRulesToAccumsAndSubsets(){
-  //   console.log('running applyRulesToAccumsAndSubsets 488')
-  //   console.table(this.accumArray)
-  //   // two arrays here.  accumArray  rulesArray
-  //   // accumArray[].accumScore is already set.
-  //   // run thru accumArray and set accum.threshHit 'y' 
-  //   // for accums that have hit a rule threshHold.
-  //   for (let i = 0; i < this.accumArray.length; i++) {
-  //     // find this accum in rulesArray to get rulesArray.thresh
-  //     //rules array index:
-  //     let rai = this.rulesArray 
-  //     .map(function(ra) { return ra.accum })
-  //     .indexOf(this.accumArray[i].accum)
-  //     if(rai > -1) { this.checkAccumAgainstRule(rai,i) }
-  //   } // end for loop on accumArray
-  // } // end applyRulesToAccumsAndSubsets
+  findGroupsWithNoRules(){
+    console.log('running findGroupsWithNoRules')
+    // this is run at the start of a qna session.
+    // look for groups that have no rule.
+    // for groups with no rule,  set group.threshHit to 'y' 
+    // becuz groups without rules are the same as hitting a thresh.
+    let rax = 0
+    for (let gax = 0; gax < this.groupArray.length; gax++) {
+       //console.log('912 looping thru groupArray')
+       //console.log(this.groupArray[gax].groupName)
+       rax = this.rulesArray
+       .findIndex(r => r.subset.toLowerCase() == this.groupArray[gax].groupName.toLowerCase())
+      //  console.log('1079 rax:' + rax.toString() )
+      if (rax == -1){
+        // we found no rule for this group.
+        //console.log('919 no rule for this group. setting threshHit to y.')
+        this.groupArray[gax].threshHit = 'y' 
+      } // end if
+    }  // end for
+    //console.log('923 end of findGroupsWithNoRules. groupArray: ')
+    //console.table(this.groupArray)
+  } // end findGroupsWithNoRules
 
-  applyRulesToAccumsAndSubsets(){
-    console.log('running applyRulesToAccumsAndSubsets 488')
-    console.table(this.accumArray)
-    // two arrays here.  accumArray  rulesArray
-    // accumArray[].accumScore is already set.
-    // run thru accumArray and set accum.threshHit 'y' 
-    // for accums that have hit a rule threshHold.
-    for (let i = 0; i < this.accumArray.length; i++) {
-      // find this accum in rulesArray to get rulesArray.thresh
-      //rules array index:
-      for (let j = 0; j < this.rulesArray.length; j++) {
-        if (this.rulesArray[j].accum == this.accumArray[i].accum) {
-          this.checkAccumAgainstRule(j,i)
+  compareRulesScoresGroups(){
+    console.log('running compareRulesScoresGroups')
+    //   loop thru rules rax++
+    //   find a score for rule(rax)
+    //   if ya got a score the rule,
+    //    check thresh of the rule compare to score
+    //   if thresh hit
+    //    find group for this rules 'will trigger group'   (rulesArray.subset) 
+    //    and set groupArray(gax).threshHit = 'y'
+    // done loop thru all rules.
+  
+    let sax = -1
+    for (let rax = 0; rax < this.rulesArray.length; rax++) {
+      sax = this.accumArray
+      .findIndex(s => s.accum.toLowerCase() == this.rulesArray[rax].accum.toLowerCase())
+      if (sax > -1){
+        // found a score for this rule   
+        let gax = -1
+        gax = this.groupArray
+        .findIndex(g => g.groupName.toLowerCase() == this.rulesArray[rax].subset.toLowerCase())
+        if (gax > -1) {
+          this.checkThresh(rax,gax,sax)
         } // end if
-      } // end inner for loop on rulesArray
-    } // end outer for loop on accumArray
-  } // end applyRulesToAccumsAndSubsetssss
+      } // end if
+    }  //end for
+  } // end compareRulesScoresGroups
 
+  checkThresh(rax,gax,sax){
+    console.log('running checkThresh')
+    //console.log('rax,gax,sax: ' +rax.toString()+gax.toString()+sax.toString() )
+    // we are current on a rule,   group,  & scoreboard.
+    // check if a rule threshold is hit for this group.
+    // rax: rules array index (was set before we got here)
+    // gax: group array index (was set before we got here)
+    // sax: accum array index (was set before we got here)
 
-  checkAccumAgainstRule(rai,i){
-    console.log('running checkAccumAgainstRule')
-    // console.log(this.rulesArray[rai].accum)
-    // console.log(this.rulesArray[rai].oper)
-    if (this.rulesArray[rai].oper == '>='
-    &&  this.accumArray[i].accumScore >= this.rulesArray[rai].thresh) { 
-      this.accumArray[i].accumThreshHit = 'y'
+    if (this.rulesArray[rax].oper == '>='
+    &&  this.accumArray[sax].accumScore >= this.rulesArray[rax].thresh) { 
+      this.groupArray[gax].threshHit = 'y'
+      //console.log ('1213 thresh hit')
     } //end if oper >=
-    if (this.rulesArray[rai].oper == '<='
-    &&  this.accumArray[i].accumScore <= this.rulesArray[rai].thresh) { 
-      this.accumArray[i].accumThreshHit = 'y'
+
+    if (this.rulesArray[rax].oper == '<='
+    &&  this.accumArray[sax].accumScore <= this.rulesArray[rax].thresh) { 
+      this.groupArray[gax].threshHit = 'y'
+      //console.log ('970 thresh hit')
     } //end if oper <=
-    if (this.rulesArray[rai].oper == '!='
-    &&  this.accumArray[i].accumScore != this.rulesArray[rai].thresh) { 
-      this.accumArray[i].accumThreshHit = 'y'
+
+    if (this.rulesArray[rax].oper == '!='
+    &&  this.accumArray[gax].accumScore != this.rulesArray[rax].thresh) { 
+      this.groupArray[gax].threshHit = 'y'
+      //console.log ('976 thresh hit')
     } //end if oper !=
-    if (this.rulesArray[rai].oper == '=='
-    &&  this.accumArray[i].accumScore == this.rulesArray[rai].thresh) { 
-      // console.log('bingoo hit thresh ==')
-      this.accumArray[i].accumThreshHit = 'y'
+
+    if (this.rulesArray[rax].oper == '=='
+    &&  this.accumArray[sax].accumScore == this.rulesArray[rax].thresh) { 
+      this.groupArray[gax].threshHit = 'y'
+      //console.log ('982 thresh hit')
     } //end if oper ==
-    if (this.rulesArray[rai].oper == '<'
-    &&  this.accumArray[i].accumScore < this.rulesArray[rai].thresh) { 
-      this.accumArray[i].accumThreshHit = 'y'
+    
+    if (this.rulesArray[rax].oper == '='
+    &&  this.accumArray[sax].accumScore == this.rulesArray[rax].thresh) { 
+      this.groupArray[gax].threshHit = 'y'
+      //console.log ('988 thresh hit')
+      // console.log(this.groupArray[gax].groupName)
+    } //end if oper =
+
+    if (this.rulesArray[rax].oper == '<'
+    &&  this.accumArray[sax].accumScore < this.rulesArray[rax].thresh) {
+      this.groupArray[gax].threshHit = 'y'
+      // console.log ('995 thresh hit')
     } //end if oper <
-    if (this.rulesArray[rai].oper == '>'
-    &&  this.accumArray[i].accumScore > this.rulesArray[rai].thresh) { 
-      this.accumArray[i].accumThreshHit = 'y'
-      // console.log('944 score > thresh ')
-      // console.table(this.rulesArray[rai])
+
+    if (this.rulesArray[rax].oper == '>'
+    &&  this.accumArray[sax].accumScore > this.rulesArray[rax].thresh) { 
+      this.groupArray[gax].threshHit = 'y'
+      // console.log ('1001 thresh hit')
     } //end if oper >
 
-    if ( this.accumArray[i].accumThreshHit == 'y') {
-    this.subsetToFilterIn = this.rulesArray[rai].subset
-    this.applyAccumToSubsets() // set subset filterInYn to y
-    }
   }
 
-  applyAccumToSubsets(){
-    // come into this para with subsetToFilterIn
-    // and use it to set one subsetArray.filterInYn
-     console.log('running applyAccumToSubsets')
-    //  console.log(this.subsetToFilterIn)
-    // console.log('find subset and set filterIn to y',this.subsetToFilterIn)
-    let ssi =
-      this.subsetArray.findIndex(obj => obj.subset === this.subsetToFilterIn)
-    this.subsetArray[ssi].filterInYn = 'y'
-    //console.table(this.subsetArray)
-    //   console.log('ssi',ssi)
-    // console.log(this.subsetArray[ssi])
-
-  } // end applyAccumToSubsets
-
-qtReadParticipants() {
-   // qtReadParticipants = async (e) => {  // dreaded async await?
-   console.log('running qtReadParticipants')
+  qtReadParticipant() {
+   // qtReadParticipant = async (e) => {  // dreaded async await?
+   console.log('running qtReadParticipant')
    api.qtReadUser(this.cust,this.qid,this.qUserId)
    .then  
       (   (qtDbRtnObj) => 
         {
           console.log(' running .then of api.qtReadUser') 
           this.buildUserObj(qtDbRtnObj)
-          this.chkUserStatus()
-          this.upsertUser()
-          this.launchQtReadSubsets() // leads to more chaining!
+          // this.chkUserStatus()
+          if (this.userObj['status'] == 'done') {
+            this.wrapUp()
+          } else {
+            this.upsertUser()
+            this.launchQtReadPastAnswers() // find past answers. has chaining.
+          } // end if
         }
       )
       .catch(() => {  // api.qtReadUser returned an error 
         console.log('api.qtReadUser error. key: ' 
         + this.cust + this.qid + this.qUserId)
       })
-} //end qtReadParticipants
+  } //end qtReadParticipant
 
-launchQtAddParticipant() {
+  launchQtAddParticipant() {
   console.log('running launchQtAddParticipant')
   api.qtAddParticipant(this.userObj)
     .then 
@@ -1020,17 +1026,16 @@ launchQtAddParticipant() {
         }
       )
       .catch(() => {  // api returned an error 
-        console.log('api.qtAddParticipant error.')
+        console.log('api.qtAddParticipant error. userObj:')
         console.log(this.userObj)
       })
 
-} //end launchQtAddParticipant
-
+  } //end launchQtAddParticipant
 
   setDiagnosticsOnOff(){
-    //console.log('running setDiagnosticsOnOff')
+    console.log('running setDiagnosticsOnOff')
     // as of Spring 2021, control diagnostics with ctrl+alt+shift
-    if (this.showDiagHtml === true) {
+    if (this.showDiagHtml == true) {
       this.showDiagHtml = false
     }else{
       this.showDiagHtml = true
@@ -1050,10 +1055,9 @@ launchQtAddParticipant() {
           .catch(() => {  // api.qtMassDeleteAnswers returned an error 
             console.log('api.qtMassDeleteAnswers error.' )
           })
-} // end massDeleteAnswers
+  } // end massDeleteAnswers
 
-massDeleteScores() {
-    alert('gonna delete Scores...')
+  massDeleteScores() {
     console.log('running massDeleteScores')
     api.qtMassDeleteScores(this.cust,this.qid)
       .then 
@@ -1066,7 +1070,7 @@ massDeleteScores() {
           console.log('api.qtMassDeleteScores error.')
           console.log('cust & qid: ' , this.cust,this.qid)
         })
-} // end massDeleteScores
+  } // end massDeleteScores
 
 } //end class QuestComponent
 
