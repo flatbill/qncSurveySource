@@ -8,33 +8,28 @@ exports.handler = async (event, context) => {
   const client = new faunadb.Client({
     secret: process.env.FAUNADB_SERVER_SECRET2
   })  
-  let myCust = "1" //event.queryStringParameters.cust 
-  let myQid = "1" //event.queryStringParameters.qid 
-  let mySubset = 'iqFollowOn'   
-  let myAccum = 'iqAccum'   
+  // let myCust = event.queryStringParameters.cust 
+  // let myQid = event.queryStringParameters.qid 
+  // let myUser = event.queryStringParameters.user
 
   /* parse the string body input into a useable JS object */
-  const dataIn = JSON.parse(event.body)
-  console.log('Function qtDeleteRule invoked. dataIn: ', dataIn)
-  myCust     = dataIn.cust
-  myQid      = dataIn.qid
-  myRuleNbr  = dataIn.ruleNbr
-  // mySubset   = dataIn.subset
-  // myAccum    = dataIn.accum
-  //(q.Match(q.Index('qtQuestionsX2'),[myCust,myQid,myQuestNbr]))
+  const data = JSON.parse(event.body)
+  let myCust = data.cust 
+  let myQid = data.qid 
+  let myUser = data.userId
+
+  console.log('Function qtUpdateUser invoked. data: ', data)
   let queryResult1 = await client.query
-  //(q.Get(q.Match(q.Index('qtRulesX2'),[myCust,myQid,mySubset,myAccum])))
-  (q.Get(q.Match(q.Index('qtRulesX2'),[myCust,myQid,myRuleNbr])))
-  console.log('pgm change 10/6/2021 07:54')
+  (q.Get(q.Match(q.Index('qtUsersX2'),[myCust,myQid,myUser])))
   console.log('queryResult1.ref: ')
   console.log(queryResult1.ref)
 
-  // const questionAdelic = {
-  //   data: data //not used for this function
-  // }
+   const userAdelic = {
+     data: data 
+   }
   
   /* construct the fauna query */
-  return client.query(q.Delete(q.Ref(queryResult1.ref)))
+  return client.query(q.Update(q.Ref(queryResult1.ref),userAdelic))
     .then((response) => {
       console.log('success', response)
       /* Success! return the response with statusCode 200 */

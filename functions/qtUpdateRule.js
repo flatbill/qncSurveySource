@@ -18,11 +18,13 @@ exports.handler = async (event, context) => {
   console.log('Function qtUpdateQuestion invoked. data: ', data)
   myCust     = data.cust
   myQid      = data.qid
-  mySubset   = data.subset
-  myAccum    = data.accum
+  myRuleNbr  = data.ruleNbr
+  // mySubset   = data.subset
+  // myAccum    = data.accum
   let queryResult1 = await client.query
-  (q.Get(q.Match(q.Index('qtRulesX2'),[myCust,myQid,mySubset,myAccum])))
-  //console.log('pgm change 2/8/2021 6:26')
+ // (q.Get(q.Match(q.Index('qtRulesX2'),[myCust,myQid,mySubset,myAccum])))
+  (q.Get(q.Match(q.Index('qtRulesX2'),[myCust,myQid,myRuleNbr])))
+  console.log('pgm change 10/6/2021 7:31')
   console.log('queryResult1.ref: ')
   console.log(queryResult1.ref)
 

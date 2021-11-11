@@ -10,26 +10,21 @@ exports.handler = async (event, context) => {
   })  
   let myCust = "1" //event.queryStringParameters.cust 
   let myQid = "1" //event.queryStringParameters.qid 
-  let mySubset = 'iqFollowOn'   
-  let myAccum = 'iqAccum'   
+  let myscoreboardNbr = '1'   
 
   /* parse the string body input into a useable JS object */
   const dataIn = JSON.parse(event.body)
-  console.log('Function qtDeleteRule invoked. dataIn: ', dataIn)
+  console.log('Function qtDeleteQuestion invoked. dataIn: ', dataIn)
   myCust     = dataIn.cust
   myQid      = dataIn.qid
-  myRuleNbr  = dataIn.ruleNbr
-  // mySubset   = dataIn.subset
-  // myAccum    = dataIn.accum
-  //(q.Match(q.Index('qtQuestionsX2'),[myCust,myQid,myQuestNbr]))
+  myScoreboardNbr = dataIn.scoreboardNbr
   let queryResult1 = await client.query
-  //(q.Get(q.Match(q.Index('qtRulesX2'),[myCust,myQid,mySubset,myAccum])))
-  (q.Get(q.Match(q.Index('qtRulesX2'),[myCust,myQid,myRuleNbr])))
-  console.log('pgm change 10/6/2021 07:54')
+  (q.Get(q.Match(q.Index('qtScoreboardsX2'),[myCust,myQid,myScoreboardNbr])))
+  console.log('api pgm last changed: 10/17/2021 8:13 am local')
   console.log('queryResult1.ref: ')
   console.log(queryResult1.ref)
 
-  // const questionAdelic = {
+  // const scoreboardAdelic = {
   //   data: data //not used for this function
   // }
   

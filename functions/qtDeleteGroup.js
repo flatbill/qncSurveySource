@@ -8,31 +8,21 @@ exports.handler = async (event, context) => {
   const client = new faunadb.Client({
     secret: process.env.FAUNADB_SERVER_SECRET2
   })  
-  let myCust = "1" //event.queryStringParameters.cust 
-  let myQid = "1" //event.queryStringParameters.qid 
-  let mySubset = 'iqFollowOn'   
-  let myAccum = 'iqAccum'   
+  let myCust     = "1"  
+  let myQid      = "1"  
+  let myGroupNbr = '1'   
 
   /* parse the string body input into a useable JS object */
   const dataIn = JSON.parse(event.body)
-  console.log('Function qtDeleteRule invoked. dataIn: ', dataIn)
-  myCust     = dataIn.cust
-  myQid      = dataIn.qid
-  myRuleNbr  = dataIn.ruleNbr
-  // mySubset   = dataIn.subset
-  // myAccum    = dataIn.accum
-  //(q.Match(q.Index('qtQuestionsX2'),[myCust,myQid,myQuestNbr]))
+  console.log('Function qtDeleteGroup invoked. dataIn: ', dataIn)
+  myCust      = dataIn.cust
+  myQid       = dataIn.qid
+  myGroupNbr  = dataIn.groupNbr
   let queryResult1 = await client.query
-  //(q.Get(q.Match(q.Index('qtRulesX2'),[myCust,myQid,mySubset,myAccum])))
-  (q.Get(q.Match(q.Index('qtRulesX2'),[myCust,myQid,myRuleNbr])))
-  console.log('pgm change 10/6/2021 07:54')
+  (q.Get(q.Match(q.Index('qtGroupsX2'),[myCust,myQid,myGroupNbr])))
+  console.log('pgm change 10/10/2021 07:54')
   console.log('queryResult1.ref: ')
   console.log(queryResult1.ref)
-
-  // const questionAdelic = {
-  //   data: data //not used for this function
-  // }
-  
   /* construct the fauna query */
   return client.query(q.Delete(q.Ref(queryResult1.ref)))
     .then((response) => {

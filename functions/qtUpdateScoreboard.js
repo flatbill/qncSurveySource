@@ -10,31 +10,26 @@ exports.handler = async (event, context) => {
   })  
   let myCust = "1" //event.queryStringParameters.cust 
   let myQid = "1" //event.queryStringParameters.qid 
-  let mySubset = 'iqFollowOn'   
-  let myAccum = 'iqAccum'   
+  let myScoreboardNbr = '1'   
 
   /* parse the string body input into a useable JS object */
-  const dataIn = JSON.parse(event.body)
-  console.log('Function qtDeleteRule invoked. dataIn: ', dataIn)
-  myCust     = dataIn.cust
-  myQid      = dataIn.qid
-  myRuleNbr  = dataIn.ruleNbr
-  // mySubset   = dataIn.subset
-  // myAccum    = dataIn.accum
-  //(q.Match(q.Index('qtQuestionsX2'),[myCust,myQid,myQuestNbr]))
+  const data = JSON.parse(event.body)
+  console.log('Function qtUpdateScoreboard invoked. data: ', data)
+  myCust     = data.cust
+  myQid      = data.qid
+  myScoreboardNbr = data.scoreboardNbr
   let queryResult1 = await client.query
-  //(q.Get(q.Match(q.Index('qtRulesX2'),[myCust,myQid,mySubset,myAccum])))
-  (q.Get(q.Match(q.Index('qtRulesX2'),[myCust,myQid,myRuleNbr])))
-  console.log('pgm change 10/6/2021 07:54')
+  (q.Get(q.Match(q.Index('qtScoreboardsX2'),[myCust,myQid,myScoreboardNbr])))
+  //console.log('pgm change 2/2/2021 8:26')
   console.log('queryResult1.ref: ')
   console.log(queryResult1.ref)
 
-  // const questionAdelic = {
-  //   data: data //not used for this function
-  // }
+   const scoreboardAdelic = {
+     data: data 
+   }
   
   /* construct the fauna query */
-  return client.query(q.Delete(q.Ref(queryResult1.ref)))
+  return client.query(q.Update(q.Ref(queryResult1.ref),scoreboardAdelic))
     .then((response) => {
       console.log('success', response)
       /* Success! return the response with statusCode 200 */
