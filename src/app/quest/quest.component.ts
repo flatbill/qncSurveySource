@@ -1,5 +1,3 @@
-//import { group } from '@angular/animations'
-import { RecurseVisitor } from '@angular/compiler/src/i18n/i18n_ast'
 import { HostListener, Component, OnInit } from '@angular/core'
 import apiFauna from 'src/utils/apiFauna'
 import apiFirestore from 'src/utils/apiFirestore'
@@ -20,7 +18,7 @@ export class QuestComponent implements OnInit {
       this.ctrlShiftAltWasHit() 
     } // end if
   } // end onKeydownHandler
-  debugLvl = 1 // set to 1 or 2 to debug.
+  debugLvl = '?' // read queryString, set to 1 or 2 to debug.
   cust = '?'
   qid = '?'
   promo = '?'
@@ -52,7 +50,7 @@ export class QuestComponent implements OnInit {
   timeGap = 0
   answerStartTime = performance.now()
   answerEndTime = performance.now()
-  answerCnt = 0
+  answerClickedCnt = 0
   answerArray = []
   qnaRound = 0
   rulesArray = []
@@ -65,7 +63,7 @@ export class QuestComponent implements OnInit {
   showDiagButHtml = false  // turn on with ctrl shift alt
   questHasLinBrk = false // questions with line breaks hit different html
   groupArray = []
-  scoreDebuggerArray = []
+  scoreDiagArray = []
   readScoreProm   = new Promise<string>((res, rej) => {})
   writeScoreProm  = new Promise<string>((res, rej) => {})
   updateScoreProm = new Promise<string>((res, rej) => {})
@@ -76,8 +74,12 @@ export class QuestComponent implements OnInit {
   querystringIcode = ''
   answerArrayStoredToDb = []
   accumIx = 0
-  dcDiagMainCnt = 0
-  // may 2021. figure out date time for all db files.
+  diagMainAnsweredCnt = 0
+  diagMainNotAnsweredCnt = 0
+  pastAnswerCount = 0
+  diagMsgArray = []
+  diagMsgObj = {}
+  // may 2021. need to figure out date time for all db files.
   // as of may 2021, we set answers and scores with 00:00 time.
   // but user db has the real latest time, so ya can see reality.
   // so, the user db duznt match answer/scores. but that seems ok.
@@ -105,7 +107,7 @@ export class QuestComponent implements OnInit {
   ngOnInit() {
     this.setQueryStringParms()
     if(this.cust>'' && this.qid> '') {
-      this.launchReadSurvey() //sticks the survey name on the page.
+      this.launchReadSurveyName() //sticks the survey name on the page.
     }
   } // end ngOnInit
   
@@ -117,6 +119,7 @@ export class QuestComponent implements OnInit {
     let locSearchResultQid   = locSearchResult.get('qid')
     let locSearchResultIcode = locSearchResult.get('icode')
     let locSearchResultPromo = locSearchResult.get('promo')
+    let locSearchResultDebugLvl = locSearchResult.get('debugLvl')
     if (locSearchResultCust != null) {
       this.cust = locSearchResultCust
     }
@@ -124,20 +127,27 @@ export class QuestComponent implements OnInit {
       this.qid = locSearchResultQid
     }
     if (locSearchResultPromo != null) {
-      this.logFun('setting promo:')
+      this.logFun('131 setting promo:')
       this.promo = locSearchResultPromo
       this.logFun(this.promo)
     }
     if (locSearchResultIcode != null) {
-      this.logFun('setting icode:')
+      this.logFun('136 setting icode:')
       this.querystringIcode = locSearchResultIcode
       this.logFun(this.querystringIcode)
     }
 
-    // when no querystring, set demo survey 
-    if(this.cust == '?'){this.cust = '2'}
+    if (locSearchResultDebugLvl != null) {
+      this.logFun('143 setting debugLvl:')
+      this.debugLvl = locSearchResultDebugLvl
+      this.logFun(this.debugLvl)
+    }
+
+    // when no querystring, set defaults:
+    if(this.cust == '?'){this.cust = '2'} // demo survey is 2,1
     if(this.qid == '?'){this.qid = '1'}
     if(this.promo == '?'){this.promo = '90210'}
+    if(this.debugLvl == '?'){this.debugLvl = '0'}
   } // end setQueryStringParms
 
   // part0 sign on ===========================================
@@ -158,8 +168,10 @@ export class QuestComponent implements OnInit {
     if (this.lastNameInput.length < 1){this.msg1='Please enter your last name.'}
     if (this.firstNameInput.length < 1){this.msg1='Please enter your first name.'}
     if ( this.surveyIcode > '' 
-    && this.querystringIcode != this.surveyIcode){
-      this.msg1= 'Your invitation is invalid or expired.'
+    && this.querystringIcode != this.surveyIcode
+    && this.cust !='2' && this.qid !='1'){ // qnc demo is 2,1. 
+      this.msg1 = 'Your email invitation link is invalid or expired.'
+      + ' To start this Qna, please follow the link from your email.'
     }
     if (this.msg1.length == 0){
       this.msg1 = 'ok'
@@ -168,11 +180,6 @@ export class QuestComponent implements OnInit {
       + this.phoneInput.trim() 
       this.showSignHtml = false
     }
-    // alert('ready to compare icode.')
-    // alert(this.querystringIcode)
-    // alert(this.surveyIcode)
-
-
   } // end validateSignOn
 
   firstNameChg(firstNameParmIn){
@@ -195,7 +202,7 @@ export class QuestComponent implements OnInit {
   } // end phoneChg
 
   buildUserObj(dbUserObj){
-    this.logFun('160 running buildUserObj ' )
+    this.logFun('202 running buildUserObj' )
     if (dbUserObj.length > 0){
       this.msg1 = 'welcome back, ' + this.firstNameInput + '.'
       this.userObj =
@@ -243,19 +250,15 @@ export class QuestComponent implements OnInit {
     // set db records into pastAnswers array.
     for (let i = 0; i < answersFromDb.length; i++) {
       this.pastAnswers.push(answersFromDb[i].data)
-      this.answerCnt = this.answerCnt + 1
+      // this.answerCnt = this.answerCnt + 1
     } // end for loop
-    this.logFun('pp220 bottom of set pastAnswers')
+    this.pastAnswerCount = this.pastAnswers.length
+    // this.logFun('pp220 bottom of set pastAnswers')
   } // end setPastAnswers
 
   answerClicked(hisAnsAcaIxFromHtml) {
     this.logFun('aa248 running answerClicked ')
-    // this.logFun('aqx hopefully is the index of the active question:')
-    // this.logFun(this.aqx)
-    this.allQuestions[this.aqx].answeredThisSession = 'y' //diagnostics
-    // this.logFun(this.activeQuestions[this.aqx].questTxt)
-    // this.logFun(this.allQuestions)
-    this.answerCnt = this.answerCnt + 1
+    this.answerClickedCnt = this.answerClickedCnt + 1
     // called from html, he clicked an answer
     this.curAca = [] // block him from answering same question too quickly
     this.curAcaFrame = [] //text above answer choices, like never,sometimes,always
@@ -263,8 +266,18 @@ export class QuestComponent implements OnInit {
     this.curPreQuest = ''
     this.calcAnswerTimeGap()
     this.storeAnswer(hisAnsAcaIxFromHtml) 
+    // Selzer Dec 2022 =====================
+    // find index of allquestions where cust=x qid=x questionnbr = x
+    // replace allQuestions[x].answeredThisRound = 'y' (for end compare)
+   let pos = this.allQuestions
+   .findIndex(a => a.cust==this.cust && a.qid==this.qid && a.questNbr==this.activeQuestions[this.aqx].questNbr)
+   if (pos>-1){ 
+     this.allQuestions[pos].answeredThisSession = 'y' //diagnostics
+   } // end if pos > -1
+    // end Dec 2022 =====================
+
     if (this.aqx < this.activeQuestions.length - 1) { 
-      this.aqx = this.aqx + 1
+      this.aqx = this.aqx + 1  //increments question we are about to ask.
       this.curQuestTxt = this.activeQuestions[this.aqx].questTxt
       this.curPreQuest = this.activeQuestions[this.aqx].preQuest 
       this.curAca = this.activeQuestions[this.aqx].aca 
@@ -309,7 +322,7 @@ export class QuestComponent implements OnInit {
   }  // end calcAnswerTimeGap
 
   storeAnswer(hisAnsAcaIx){
-    this.logFun('aa309 running storeAnswer ')
+    this.logFun('aa322 running storeAnswer ')
     // for the recently answered question (the active question),
     // set a point value into hisAnsPoints.
     // he gave an answer, and we captured it into hisAnsAcaIx.
@@ -326,18 +339,18 @@ export class QuestComponent implements OnInit {
     this.writeAnswerToDb(this.answerObj) 
     this.calcPointsSetAccum() // this happens in mulitple spots
     this.msg1 = this.firstNameInput + "'s " 
-    + 'answer count: ' + this.answerCnt 
+    + 'answer count: ' + this.answerClickedCnt 
     // update participant db every 5 answers
-    if (this.answerCnt / 5 ==  Math.round(this.answerCnt/5)){
+    if (this.answerClickedCnt / 5 ==  Math.round(this.answerClickedCnt/5)){
       Object.assign(this.userObj,{userDateTime: this.dateTimeNow })
       Object.assign(this.userObj,{status:  'active' })
-      Object.assign(this.userObj,{priorQ: this.answerCnt})
+      Object.assign(this.userObj,{priorQ: this.answerClickedCnt})
       this.updateParticipantDb(this.userObj,'from writeAnswer')  
     } // end if
   } //end storeAnswer
 
   buildAnswerObj(){
-    this.logFun('aa331 running buildAnswerObj' )
+    this.logFun('aa350 running buildAnswerObj' )
     this.answerObj = 
     {
       "cust": this.cust,
@@ -355,7 +368,7 @@ export class QuestComponent implements OnInit {
         // when building an answer rec, we copy-in the accum array 
         // from the question to help later with scoring.
         // we are NOT adding to answers.accum here,
-        // we use answers.addPointsStatus later, to add to accumaArray
+        // we use answers.addPointsStatus later, to add to accumArray
         // to keep track of whether the answer points have been added yet.
         // we store answers to the database as we go.
   } // end buildAnswerObj
@@ -364,7 +377,7 @@ export class QuestComponent implements OnInit {
     this.logFun('aa354 running writeAnswerToDb' )
     // writing to the db is helpful for later admin retrieval,
     // but for now, only the answerArray is useful.
-    if (this.debugLvl>0){this.msg1 = 'saving answer...'}
+    this.msg1 = 'saving answer...'
     apiFauna.qtWriteAnswer(answerObjParm)
         .then 
         (   (qtDbRtnObj) => 
@@ -389,7 +402,7 @@ export class QuestComponent implements OnInit {
 
   launchQtReadPastAnswers() {
     this.logFun('pp387 running launchQtReadPastAnswers ' ) 
-    if (this.debugLvl>0){this.msg1 = 'reading past answers...'}
+    this.msg1 = 'reading past answers...'
     apiFauna.qtReadAnswers(this.cust, this.qid, this.qUserId)
       .then 
         (   (qtDbRtnObj) => 
@@ -403,8 +416,8 @@ export class QuestComponent implements OnInit {
         )
         .catch(() => {  // apiFauna.qtReadAnswers returned an error 
           this.msg1 = 'error reading answers.'
-          console.log('apiFauna.qtReadAnswers error. cust & qid & user ')
-          console.log(this.cust, ' ', this.qid,' ',this.qUserId,' ')
+          this.logFun('apiFauna.qtReadAnswers error. cust & qid & user ')
+          this.logFun(this.cust+ ' '+ this.qid+' '+this.qUserId)
         })
   } //end launchQtReadPastAnswers
 
@@ -445,8 +458,7 @@ export class QuestComponent implements OnInit {
 
   findAccumAndAddPoints(accumParmIn,ansPointsParmIn,ansTimeGapParmIn){
     // if(ansPointsParmIn==0){'adding zero to accum!'}
-    this.logFun('aa440 running findAccumAndAddPoints.')
-    this.logFun('accum: ' + accumParmIn )
+    this.logFun('aa440 running findAccumAndAddPoints. accum: ' + accumParmIn )
     // this.logFun(ansPointsParmIn)
     // called for one accum (from answerArray). update accumArray.
     // find matching accumArray row:
@@ -462,13 +474,13 @@ export class QuestComponent implements OnInit {
             // he answered the last question that adds to this accum.
             // hmmm, what about returner where scores not yet upserted?
             // this  is this a good place to compare rules to thresh.
-            this.logFun('aa455 he answered last question that adds to this accum:')
-            this.logFun('accum: '+ this.accumArray[pos].accum)
+            this.logFun('aa455 he answered last question for this accum:'
+             + this.accumArray[pos].accum)
             //this.logFun(this.accumArray[pos].accum)
             this.compareRulesScoresGroups(pos)
             this.accumArray[pos].accumNeedsDbScoreUpsert = 'y'
             this.readOneScoreUpdateOrWriteOneScore(pos)
-            this.logFun('aa466 returned from call to readOneScoreUpdateOrWriteOneScore' )
+            this.logFun('aa466 returned from readOneScoreUpdateOrWriteOneScore' )
             // read/write score is now running on its own thread.
       } // end if
     } // end if
@@ -493,20 +505,17 @@ export class QuestComponent implements OnInit {
         this.updateScoreProm = await this.updateScoreToDb(myScoreObj)
         this.logFun('bb529 done await updateScoreToDb ' )
         this.accumArray[i].accumNeedsDbScoreUpsert = 'n'  
-        let sdx = this.scoreDebuggerArray
+        let sdx = this.scoreDiagArray
         .findIndex(sda => sda.accum == this.accumArray[i].accum)
-        this.scoreDebuggerArray.splice(sdx,1,myScoreObj)
+        this.scoreDiagArray.splice(sdx,1,myScoreObj)
       }
     } else {
       this.logFun('bb529 ready to run writeScore' )
       this.writeScoreProm = await this.writeScoreToDb(myScoreObj) 
       this.logFun('bb529 done await writeScoreToDb ' )
       this.accumArray[i].accumNeedsDbScoreUpsert = 'n' 
-
-      if (this.debugLvl > 0) {
-        this.msg1='finished writing score.'
-      }
-      this.scoreDebuggerArray.push(myScoreObj)
+      this.logFun('524 finished writing score')
+      this.scoreDiagArray.push(myScoreObj)
     }  // end if
   } // end readOneScoreUpdateOrWriteOneScore
 
@@ -514,21 +523,21 @@ export class QuestComponent implements OnInit {
     this.logFun('bb636 running launchQtReadScore' )
     // this.logFun('bb636 scoreObjParmIn accum:') 
     // this.logFun(scoreObjParmIn['accum'] )
-    if (this.debugLvl>0){this.msg1 = 'reading score...'}
+    this.logFun( '532 reading score')
     let readScoreRes =   
       await apiFauna.qtReadScore(this.cust,this.qid,this.qUserId,scoreObjParmIn['accum'])
       .catch(() => {  // apiFauna.qtReadScore returned an error 
-        console.log('apiFauna.qtReadScore error.')
-        console.log('cust & qid: & user & scoreboardName:')
-        console.log(this.cust,this.qid,this.qUserId,scoreObjParmIn['accum'])
+        this.logFun('apiFauna.qtReadScore error.')
+        this.logFun('cust & qid: & user & scoreboardName:')
+        this.logFun(this.cust+this.qid+this.qUserId+scoreObjParmIn['accum'])
         }) // end catch
-    this.logFun('bb636 bottom of launchQtReadScore' )
+    // this.logFun('bb636 bottom of launchQtReadScore' )
     return readScoreRes // a promise ... always resolved?
   } //  end launchQtReadScore
 
   buildScoreObj(i){
-    this.logFun('bb576 running buildScoreObj for')
-    this.logFun('accum:' + this.accumArray[i].accum)
+    this.logFun('bb576 running buildScoreObj for accum: '
+                + this.accumArray[i].accum)
     let scoreObj =
     {
       'cust': this.cust,
@@ -548,7 +557,7 @@ export class QuestComponent implements OnInit {
     this.logFun('bb573 running writeScoreToDb ')
     // this.logFun(scoreObjParmIn.accum)
     // this.logFun(scoreObjParmIn.score)
-    if (this.debugLvl>0){this.msg1 = 'writing score...'}
+    //this.msg1 = 'writing score...'
     // write to db table qtScores
     let  writeScoreResult = await apiFauna.qtWriteScore(scoreObjParmIn)
           .then(() => {
@@ -568,50 +577,59 @@ export class QuestComponent implements OnInit {
     this.logFun('bb588 running updateScoreToDb ' )
     // we wont ever hit this para, if we have done it right.
     // we should only writeScoreToDb, never updateScoreToDb
-    if (this.debugLvl>0){this.msg1 = 'updating score...'}
+    this.msg1 = 'updating score...'
     // this.logFun('bb588 scoreObjParmIn: =====')
     // this.logFun(scoreObjParmIn)
     let updateScoreResult = 
     await apiFauna.qtUpdateScore(scoreObjParmIn)
     .catch(() => {
       this.msg1 = 'error updating score.'
-      console.log('qtUpdateScore error. ' )
-      console.table(scoreObjParmIn)
+      this.logFun('qtUpdateScore error. ' )
+      this.logFun(scoreObjParmIn)
     }) // end catch
     return updateScoreResult
   }  // end updateScoreToDb
   
   updateParticipantDb(userObjParmIn,fromWhere){
-    this.logFun('running updateParticipantDb')
-    if (this.debugLvl>0){this.msg1 = 'updating participant...'}
+    this.logFun('594 running updateParticipantDb')
+    //this.msg1 = 'updating participant...'
     apiFauna.qtUpdateParticipant(userObjParmIn)
     .then 
       ((qtDbRtnObj) => {
         this.logFun('aa607 running .then of apiFauna.qtUpdateParticipant ' )
         // this.logFun(userObjParmIn)
         if (fromWhere == 'from wrapUp') {
-          this.msg1 = 'you have finished the Qna.'
+          //this.msg1 = 'you have finished the Qna.'
         } else {
-          if (this.debugLvl>0){
-            this.msg1 = 'finished updating participant...'
-          } // end inner if
-        } // end outer if
+         // this.msg1 = 'finished updating participant...'
+        } // end  if
         this.qtDbDataObj = qtDbRtnObj.data
       } ) // end .then
   .catch(() => {
     this.msg1 = 'error updating participant.'
-    console.log('601 updateParticipantDb error. userObjParmIn:')
-    console.table(userObjParmIn)
+    this.logFun('601 updateParticipantDb error. userObjParmIn:')
+    this.logFun(userObjParmIn)
   })
   return ''
   } // end updateParticipantDb
+
+  buildDiagMsgObj(diagMsgDateTime, diagMsgParmIn){
+    //this.logFun('617 running buildDiagMsgObj' )
+    this.diagMsgObj = 
+    {
+      "cust": this.cust,
+      "qid": this.qid,
+      "quserId": this.qUserId,
+      "diagMsgDateTime": diagMsgDateTime,
+      "diagMsg": diagMsgParmIn
+    } // end diagMsgObj
+  } // end fun buildDiagMsgObj
 
   matchAllQuestionsToAlreadyAnsweredQuestions(){
     this.logFun('pp626 running matchAllQuestionsToAlreadyAnsweredQuestions ' )
     this.logFun('count of past answers: ' + this.pastAnswers.length)
     this.logFun('pp626 past answers array:')
-    this.logFun(this.pastAnswers)
-    // allQuestions questNbr
+    this.pastAnswers    
     // pastAnswers questNbr
     // if ya find a match: set allQuestions.answeredAlready to 'y'
     let j = 0
@@ -624,29 +642,7 @@ export class QuestComponent implements OnInit {
       }
     } // end for
 
-    // Dec 2022 dc diagnostics
-    if (this.surveyName=='Digital Couch') {
-      // detailed diagnostics for dc:
-      // count  not-yet-answered questions in group 'Main'
-      // count  already-answered questions in group 'Main'
-      this.logFun('631 count some questions in group Main')
-      this.logFun(this.allQuestions)
-      for (let i=0;i<this.allQuestions.length;i++){
-        if (this.allQuestions[i].subset == 'Main') {
-          this.dcDiagMainCnt = this.dcDiagMainCnt + 1  
-        } // end if
-      } //end for 
-      // this.allQuestions[i].answeredAlready == 'y'
 
-      this.logFun('dcDiagMainCnt:')
-      this.logFun (this.dcDiagMainCnt) // should be 205 questions
-      if (this.dcDiagMainCnt == 205 ){
-        this.logFun('dcDiagMainCnt is 205 at the start.')
-      }else{
-        this.logFun('dcDiagMainCnt is not 205 at the start.')
-      } // end if mainCnt 205
-    }  // end if survey is dc
-    this.logFun('pp626 allQuestions at bottom of matchAllQuestionsToAlreadyAnsweredQuestions')
 
   } // end matchAllQuestionsToAlreadyAnsweredQuestions
 
@@ -677,7 +673,7 @@ export class QuestComponent implements OnInit {
         this.groupArray[i].statusQnA = 'done'
       }
     } // end for
-    this.logFun('pp650 bottom of setAlreadyCompletedGroups. ')
+    // this.logFun('pp650 bottom of setAlreadyCompletedGroups. ')
   } // end setAlreadyCompletedGroups
 
   findNextRoundOfActiveQuestions(){
@@ -685,7 +681,7 @@ export class QuestComponent implements OnInit {
     // this.logFun('643 groupArray:')
     // this.logFun(this.groupArray)
     // driven by groupArray. status=pending, threshHit==y
-    if (this.debugLvl>0){this.msg1 = 'building next round of questions...'}
+    this.msg1 = 'building next round of questions...'
     this.activeQuestions.length = 0  // start fresh for the upcoming round
     // part a:
     // look thru groupArray for the first group seq not yet asked.
@@ -701,28 +697,28 @@ export class QuestComponent implements OnInit {
     let gax = -1
     gax = this.groupArray
     .findIndex(g  => g.statusQnA == 'pending' && g.threshHit == 'y')
-    this.logFun('qna686 gax:')
-    this.logFun(gax)
+    this.logFun('qna686 gax: '+ gax)
+    // this.logFun(gax)
     let myGroupSeq = '9999'
     if (gax > -1) {
       myGroupSeq = this.groupArray[gax].seq.toLowerCase()
-      this.logFun('qna686 myGroupSeq:')
-      this.logFun(myGroupSeq)
+      this.logFun('qna686 myGroupSeq: ' + myGroupSeq)
+      // this.logFun(myGroupSeq)
     }
     for (let i = 0; i < this.groupArray.length; i++) {
       if (this.groupArray[i].seq.toLowerCase() == myGroupSeq 
       && this.groupArray[i].threshHit == 'y'
       && this.groupArray[i].statusQnA == 'pending') {
         this.groupArray[i]['statusQnA'] = 'active'
-        this.logFun('changed groupArray status from pending to active:')
-        this.logFun(this.groupArray[i].groupName)
+        this.logFun('715 chg stat pend to active. GroupName: ' 
+         + this.groupArray[i].groupName)
       } // end if 
     } // end for
     let activeGroups = []
     for (let i = 0; i < this.groupArray.length; i++) {
       if (this.groupArray[i].statusQnA == 'active') {
-        this.logFun('qna686 pushing into activeGroups:')
-        this.logFun(this.groupArray[i].groupName)
+        this.logFun('qna686 pushing into activeGroups. GroupName: '
+         + this.groupArray[i].groupName)
         activeGroups.push(this.groupArray[i].groupName.toLowerCase())
       } //end if
     }  //end for
@@ -735,7 +731,7 @@ export class QuestComponent implements OnInit {
       } // end if
     }  //end for
     this.qnaRound = this.qnaRound + 1 
-    this.logFun('qna686 bottom of findNextRoundOfActiveQuestions')
+    // this.logFun('qna686 bottom of findNextRoundOfActiveQuestions')
     // this.logFun('qna686 myGroupSeq:')
     // this.logFun(myGroupSeq)
   } // end findNextRoundOfActiveQuestions
@@ -761,9 +757,7 @@ export class QuestComponent implements OnInit {
 
   setRoundFirstActiveQuest(){
     this.logFun('qna773 running setRoundFirstActiveQuest ' )
-    if (this.debugLvl>0){
-      this.msg1='starting a round of questions. ' //+ (this.qnaRound) + '.'
-    }
+    this.msg1='starting a round of questions. ' //+ (this.qnaRound) + '.'
     this.curQuestTxt = ''
     this.curPreQuest = ''
     this.curAca = []
@@ -786,38 +780,19 @@ export class QuestComponent implements OnInit {
        // do something wonderful, but running wrapUp might not be right.
        //this.wrapUp() // running wrapUp twice??
     }
-    this.logFun('qna766 bottom of setRoundFirstActiveQuest')
+    // this.logFun('qna766 bottom of setRoundFirstActiveQuest')
       } // end of setRoundFirstActiveQuest
 
   async wrapUp(){
     this.logFun('ww789 running wrapUp ' )
-    this.msg1 = 'wrapping up answers and scores...'
+    //this.msg1 = 'wrapping up answers and scores...'
     this.showQuestHtml = false
     this.showAnswerGroupHtml = false
     this.logFun('ww794 final answers in answerArray:')
     this.logFun(this.answerArray)
     this.logFun('ww794 final accums in accumArray:')
     this.logFun(this.accumArray)
-
-    // Dec 2022 Selzer. 
-    // look for any scores not yet written, and write them.
-    // read accumArray, see if there are any not-yet-written scores.
-    // look for a mismatch between questions asked and total questions.
-    // these might be for questions that were never asked,
-    // cuz they are part of un-asked groups,
-    // yet some groups WERE asked. (there is a score > 0)
-    for (let i=0;i<this.accumArray.length;i++){
-      if (this.accumArray[i].accumScore > 0) {
-          if (this.accumArray[i].accumQuestCnt 
-              != this.accumArray[i].accumQuestCntTot ) {
-               this.logFun('found a not-yet-scored accumArray row')
-               this.logFun('need to call para to store this one accum:')
-               this.logFun(this.accumArray[i].accum)
-               this.accumArray[i].accumNeedsDbScoreUpsert = 'y'
-              //  this.readOneScoreUpdateOrWriteOneScore(i) billyy
-          } // end inner if
-      } //end outer if
-    } // end for
+    this.checkForAnyMissingScores()
     // this.logFun('812 wrap up')
 
     // somehow, wait for db updates to answers,scores,participants
@@ -831,26 +806,29 @@ export class QuestComponent implements OnInit {
     //   .then((allPromVals) => {
     //})
 
-    ///=== hack to wait for db updates. 
+    ///=== hack to wait for db updates. wait for 3500 milliseconds.
     this.logFun('ww start timeout wait ') 
-    this.msg1 =  this.answerArray.length.toString() + ' answers. '
-              +  this.accumArray.length.toString()  + ' scores. '
-     + ' Wrapping up answers and scores...'
+    this.msg1 =  ' Wrapping up answers and scores... '
+      + this.answerArray.length.toString() + ' answers. '
+      + this.accumArray.filter(a=> a.accumScore>0).length.toString()
+      + ' scores.  '
     let promise1 = new Promise((resolve, reject) => {
-      setTimeout(() => resolve(" timeout resolve"), 3500) // 3.5 seconds
+      setTimeout(() => resolve(" timeout resolve"), 3500) // 5.5 seconds
     })
     let prom1var = await promise1 // wait until promise1 resolves (*)
     this.logFun('ww end timeout wait ') 
-    ///===
+    ///=== done waiting, now run the rest of this paragraph.
 
     this.userObj['status']       = 'done'
     this.userObj['userDateTime'] = this.dateTimeNow 
-    this.userObj['priorQ']       = this.answerCnt
+    this.userObj['priorQ']       = this.answerClickedCnt
     this.updateParticipantDb(this.userObj,'from wrapUp')
 
     this.atEndCompareQuestionCounts()
     this.atEndCompareAccumsAndScores()
-    // this.atEndCompareAnswersToStoredAnswers() //duznt work billyy
+    this.atEndCompareAnswerCounts() 
+    this.logFun('830 diagMsgArray:')
+    this.logFun(this.diagMsgArray)
     this.msg1 = 'Thank you, ' + this.firstNameInput
     + ', for taking this Qna. '
     this.showDoneHtml = true
@@ -859,25 +837,50 @@ export class QuestComponent implements OnInit {
     // < a href="mailto:john@example.com">John< /a>
   } // end wrapUp
 
+  checkForAnyMissingScores(){
+    this.logFun('running checkForAnyMissingScores ' )
+    // Dec 2022 Selzer. 
+    // look for any scores not yet written, and write them:
+    // read accumArray, see if there are any not-yet-written scores.
+    // look for a mismatch between questions asked and total questions.
+    // these might be for questions that were never asked,
+    // cuz they are part of un-asked (never triggered) groups,
+    // yet some groups WERE asked. (there is a score > 0)
+    this.logFun('851 accumArray:')
+    this.logFun(this.accumArray)
+    for (let i=0;i<this.accumArray.length;i++){
+      if (this.accumArray[i].accumScore > 0) {
+          if (this.accumArray[i].accumQuestCnt 
+              != this.accumArray[i].accumQuestCntTot ) {
+               this.logFun('854 found a not-yet-scored accumArray row.')
+               this.logFun('calling para to store this one accum: '
+               + this.accumArray[i].accum)
+               //  this.accumArray[i].accumNeedsDbScoreUpsert = 'y'
+               this.readOneScoreUpdateOrWriteOneScore(i) 
+          } // end inner if
+      } //end outer if
+    } // end for
+  } // end fun
+
   atEndCompareAccumsAndScores(){
     this.logFun('ww824 running atEndCompareAccumsAndScores')
-    // a debug-ish para.
+    // run diagnostics at the end of the survey/assessment.
     let sdx = -1
     for (let i=0;i<this.accumArray.length;i++){
       // scoreDebugger array: we built that thing
       // when we inserted & updated score recs.
-      sdx = this.scoreDebuggerArray
+      sdx = this.scoreDiagArray
       .findIndex(sda => sda.accum == this.accumArray[i].accum)
-      if (sdx==-1 && this.accumArray[i].accuQuestCnt > 0){
-        console.log('ww824 rats, no scoredebugger rec to match accumArray accum:')
-        console.log(this.accumArray[i].accum)
+      if (sdx==-1 && this.accumArray[i].accumQuestCnt > 0){
+        this.logFun('ww824 rats, no scoredebugger rec to match accumArray accum:')
+        this.logFun(this.accumArray[i].accum)
       }
-      if (sdx>-1 && this.accumArray[i].accumScore != this.scoreDebuggerArray[sdx].score){
-        console.log('ww824 rats, mismatch accumArray and scoreDebuggerArray.')
-        console.log('ww824 accumArray accum:',this.accumArray[i].accum)
-        console.log('ww824 accumArray accumscore:',this.accumArray[i].accumScore)
-        console.log('ww824 scoreDebuggerArray accum:',this.scoreDebuggerArray[sdx].accum)
-        console.log('ww824 scoreDebuggerArray score:',this.scoreDebuggerArray[sdx].score)
+      if (sdx>-1 && this.accumArray[i].accumScore != this.scoreDiagArray[sdx].score){
+        this.logFun('ww824 rats, mismatch accumArray and scoreDiagArray.')
+        this.logFun('ww824 accumArray accum: '+this.accumArray[i].accum)
+        this.logFun('ww824 accumArray accumscore: '+this.accumArray[i].accumScore)
+        this.logFun('ww824 scoreDiagArray accum: '+this.scoreDiagArray[sdx].accum)
+        this.logFun('ww824 scoreDiagArray score: '+this.scoreDiagArray[sdx].score)
       }  // end if
     } // end for
 
@@ -889,58 +892,59 @@ export class QuestComponent implements OnInit {
         this.logFun( this.accumArray[i].questCnt)
         this.logFun('accumArray question count total:')
         this.logFun( this.accumArray[i].questCnt)
-        // billy, write to new fauna error table.
-        // also, compare scores written to scores array.
+        // compare scores written to scores array?
       } // end if
     } // end for
   } // end atEndCompareAccumsAndScores
 
-  atEndCompareAnswersToStoredAnswers() {
-    this.logFun('ww824 running atEndCompareAnswersToStoredAnswers')
-    this.logFun('past answers count: ' + this.pastAnswers.length)
+  atEndCompareAnswerCounts() {
+    this.logFun('ww824 running atEndCompareAnswerCounts')
+    this.logFun('past answers count: ' + this.pastAnswerCount)
+    this.logFun('answer clicked this session count: '+ this.answerClickedCnt )
     this.logFun('answers captured this session count: ' + this.answerArrayStoredToDb.length)
-    // this.logFun('answerArrayStoredToDb:')
-    // this.logFun(this.answerArrayStoredToDb)
-    let totAnswerCount = 
-      this.pastAnswers.length
-      + this.answerArrayStoredToDb.length
-    if (this.answerArray.length != totAnswerCount){
-      this.logFun('908 rats, answerArray mismatch total answer count.')
-      this.logFun('past answers:')
-      this.logFun(this.pastAnswers)
-      this.logFun(' answerArray:')
-      this.logFun(this.answerArray)
-      this.logFun('answerArrayStoredToDb:')
-      this.logFun(this.answerArrayStoredToDb)
-      
-      // billy, maybe find some missing answers?  and also re-score?
+    // let answersThisSessionCount = 
+    //   this.allQuestions.filter(a=>a.answeredThisSession == 'y').length
+
+    if (this.answerClickedCnt != this.answerArrayStoredToDb.length){
+      this.logFun('908 rats, answerCount mismatch.')
     } // end if
-  } // end atEndCompareAnswersToStoredAnswers
+
+      let questionsNotAsked = this.allQuestions
+          .filter(a=>a.answeredAlready == 'n'
+                  && a.answeredThisSession == 'n') 
+
+      this.logFun('answers stored to db this session count:' + this.answerArrayStoredToDb.length  )
+      this.logFun('questions not answered (assume not asked) count: '
+                  + questionsNotAsked.length)
+      this.logFun('924 allQuestions array: ')
+      this.logFun(this.allQuestions)
+      this.logFun('920 questions not answered (assume not asked) array: ')
+      this.logFun(questionsNotAsked)
+      this.logFun('922 answerArray:')
+      this.logFun(this.answerArray)
+      
+  } // end atEndCompareAnswerCounts
 
   atEndCompareQuestionCounts() {
-    let completedQuestionCountMain = 0
-    this.logFun('904 running atEndCompareQuestionCounts')
-    if (this.surveyName=='Digital Couch') {
-      this.logFun('allQuestions Main marked as asked:')
-      for (let i = 0; i < this.allQuestions.length; i++) {
-        if (this.allQuestions[i].alreadyAnswered == 'y'
-        && this.allQuestions[i].subset == 'Main')  {
-          completedQuestionCountMain += 1
-        }
-        if (this.allQuestions[i].answeredThisSession == 'y'
-        && this.allQuestions[i].subset == 'Main')  {
-          completedQuestionCountMain += 1
-        }
-      } //end for
-    } // end if
-    this.logFun('923 compare dc diag main to completd question count main:')
-    this.logFun(this.dcDiagMainCnt)  
-    this.logFun(completedQuestionCountMain)
-  } // end of atEndCompareQuestionCounts
+    this.logFun('939 running atEndCompareQuestionCounts')
+  
+      // Dec 2022 group main diagnostics
+    // count  not-yet-answered questions in group 'Main'
+    // count  already-answered questions in group 'Main'
+    this.diagMainAnsweredCnt = this.allQuestions
+      .filter(a=> a.subset == 'Main'  && a.answeredThisSession == 'y')
+      .length
+    this.diagMainNotAnsweredCnt = this.allQuestions
+    .filter(a=> a.subset == 'Main'  && a.answeredThisSession != 'y')
+    .length
+
+   this.logFun('Main questions asked: ' +this.diagMainAnsweredCnt)
+   this.logFun('Main questions not asked: ' +this.diagMainNotAnsweredCnt)
+} // end atEndCompareQuestionCounts
    
   launchQtReadQuestions () {
     this.logFun('pp846 running launchQtReadQuestions')
-    if (this.debugLvl>0){this.msg1 = 'reading questions...'}
+    this.msg1 = 'reading questions...'
     apiFauna.qtReadQuestions(this.cust,this.qid)
         .then 
         (   (qtDbRtnObj) => 
@@ -955,10 +959,10 @@ export class QuestComponent implements OnInit {
         )
         .catch(() => {  // apiFauna.qtReadQuestions returned an error 
           this.msg1 = 'error reading questions.'
-          console.log('apiFauna.qtReadQuestions error. cust and qid:' )
-          console.log(this.cust,this.qid)
+          this.logFun('apiFauna.qtReadQuestions error. cust and qid:' )
+          this.logFun(this.cust + this.qid)
         })
-  }
+  } // end launchQtReadQuestions
  
   loadQuestionsFromDbToAllQuestions(qtDbObj){
     this.logFun('pp866 running loadQuestionsFromDbToAllQuestions ' )
@@ -975,7 +979,7 @@ export class QuestComponent implements OnInit {
         // this.allQuestions[i].accum[j] = this.allQuestions[i].accum[j].toLowerCase()
       } // end inner for
     } // end outer for
-    this.logFun('bottom of loadQuestionsFromDbToAllQuestions')
+    // this.logFun('bottom of loadQuestionsFromDbToAllQuestions')
     // this.logFun(this.allQuestions)
   }  // end loadQuestionsFromDbToAllQuestions
 
@@ -1007,17 +1011,13 @@ export class QuestComponent implements OnInit {
         } // end if
       } // end inner for
     } // end outer for
-    this.logFun('pp885 bottom of buildListOfAccumsFromAllQuestions.')
+    // this.logFun('pp885 bottom of buildListOfAccumsFromAllQuestions.')
     // this.logFun(this.accumArray)
   } //end buildListOfAccumsFromAllQuestions
 
-  // countQuestionsIntoAccumArray(){
-  //   this.logFun('running countQuestionsIntoAccumArray')
-  // }
-
   launchQtReadGroups() {
     this.logFun('pp918 running launchQtReadGroups ' )
-    if (this.debugLvl>0){this.msg1 = 'reading question groups...'}
+    this.msg1 = 'reading question groups...'
     apiFauna.qtReadGroups(this.cust,this.qid)
         .then 
         (   (qtDbRtnObj) => 
@@ -1030,8 +1030,8 @@ export class QuestComponent implements OnInit {
         )
         .catch(() => {  // apiFauna.qtReadGroups returned an error 
           this.msg1 = 'error reading groups.'
-          console.log('apiFauna.qtReadGroups error.')
-          console.log('cust & qid:',this.cust,this.qid)
+          this.logFun('apiFauna.qtReadGroups error.')
+          this.logFun('cust & qid: '+this.cust+this.qid)
         })
   } //end launchQtReadGroups
 
@@ -1086,7 +1086,7 @@ export class QuestComponent implements OnInit {
 
   launchQtReadRules(){
     this.logFun('pp986 running launchQtReadRules ' )
-    if (this.debugLvl>0){this.msg1 = 'reading rules...'}
+    this.msg1 = 'reading rules...'
     apiFauna.qtReadRules(this.cust,this.qid)
       .then 
         (   (qtDbRtnObj) => 
@@ -1102,8 +1102,8 @@ export class QuestComponent implements OnInit {
         )
         .catch(() => {  // apiFauna.qtReadRules returned an error 
           this.msg1 = 'error reading rules.'
-          console.log('apiFauna.qtReadRules error. cust and qid:')
-          console.log(this.cust,this.qid)
+          this.logFun('apiFauna.qtReadRules error. cust and qid:')
+          this.logFun(this.cust+this.qid)
         })
 
   } //end launchQtReadRules
@@ -1164,7 +1164,7 @@ export class QuestComponent implements OnInit {
         } // end if
       }  //end if
     } //end for
-    this.logFun('pp1046 bottom of compareRulesScoresGroups.')
+    // this.logFun('pp1046 bottom of compareRulesScoresGroups.')
   } // end compareRulesScoresGroups
 
   checkThresh(rax,gax,sax){
@@ -1231,7 +1231,7 @@ export class QuestComponent implements OnInit {
 
   readParticipantUpdateOrAddParticipant() {
    this.logFun('aa1141 running readParticipantUpdateOrAddParticipant')
-   if (this.debugLvl>0){this.msg1 = 'reading participant...'}
+   this.msg1 = 'reading participant...'
    apiFauna.qtReadUser(this.cust,this.qid,this.qUserId)
    .then  
       ((qtDbRtnObj) => {
@@ -1261,7 +1261,7 @@ export class QuestComponent implements OnInit {
 
   launchQtAddParticipant() {
   this.logFun('1165 running launchQtAddParticipant ' )
-  if (this.debugLvl>0){this.msg1 = 'adding participant...'}
+  //this.msg1 = 'adding participant...'
   apiFauna.qtAddParticipant(this.userObj)
     .then 
       (   (qtDbRtnObj) => 
@@ -1275,15 +1275,15 @@ export class QuestComponent implements OnInit {
       )
       .catch(() => {  // api returned an error 
         this.msg1 = 'error adding participant.'
-        console.log('1165 apiFauna.qtAddParticipant error. userObj:')
-        console.log(this.userObj)
+        this.logFun('1165 apiFauna.qtAddParticipant error. userObj:')
+        this.logFun(this.userObj)
       })
 
   } //end launchQtAddParticipant
 
-  launchReadSurvey(){
-    this.logFun('1149 running launchReadSurvey ' )
-    if (this.debugLvl>0){this.msg1 = 'finding your Qna...'}
+  launchReadSurveyName(){
+    this.logFun('1149 running launchReadSurveyName ' )
+    this.msg1 = 'finding your Qna...'
     apiFauna.qtReadSurvey(this.cust,this.qid)
           .then ((qtDbRtnObj) => 
           {
@@ -1296,19 +1296,13 @@ export class QuestComponent implements OnInit {
           } )
         .catch(() => {  // api returned an error 
           this.msg1 = 'error reading survey.'
-          console.log('1165 apiFauna.readSurvey error.',this.cust,this.qid)
+          this.logFun('1165 apiFauna.readSurvey error.'+this.cust+this.qid)
         })
-  
-  
-  }
-  debugAnswerError(answerObjParm){
-    this.logFun('1204 running debugAnswerError.  Attempt to write error rec...')
-    this.launchQtWriteErrorRec(answerObjParm)
+  } // end launchReadSurveyName
 
-  }
-  launchQtWriteErrorRec(errorObjParm){
-    this.logFun('1208 running launchQtWriteErrorRec, billy you are here')
-  }
+  debugAnswerError(answerObjParm){
+    this.logFun('1204 running debugAnswerError. ')
+  } // end debugAnswerError
 
   ctrlShiftAltWasHit(){
     this.logFun('running ctrlShiftAltWasHit ')
@@ -1323,28 +1317,40 @@ export class QuestComponent implements OnInit {
   logFun(logParmIn1){
     // use this instead of console.log and console.table.
     // logs only if debugLvl not equal 0.
-    if (this.debugLvl==0){ return }
+    if (this.debugLvl=='0'){ return }
+    let nd = new Date() //format datetime to 2022/12/31 01:31:32.555
+    let a = nd.toLocaleDateString('zh-CN')
+    let b = nd.getHours().toString().padStart(2,'0')
+    let c = nd.getMinutes().toString().padStart(2,'0')
+    let d = nd.getSeconds().toString().padStart(2,'0')
+    let e = nd.getMilliseconds().toString().padStart(3, '0') 
+    let myDateTime = a+' '+b+':'+c+':'+d+'.'+e
+    
     if (typeof logParmIn1  == 'object') {
-      console.table(logParmIn1)
-      console.log(Date.now())
+      console.table(logParmIn1 )
+      console.log('💫',myDateTime)
+      //💫 Dizzy https://emojipedia.org/emoji-1.0/
     } else {
-      console.log(logParmIn1,Date.now())
-    } // end if
-  } // end logFun
+      console.log(myDateTime, '💠', logParmIn1 )
+      //💠 Diamond with a Dot
+      this.buildDiagMsgObj(myDateTime , logParmIn1)
+      this.diagMsgArray.push(this.diagMsgObj)
+      // maybe someday write to fauna log    
+      // this.writeDiagMsgToDb(this.diagMsgObj) 
+    } // end if 
+} // end logfun
 
-  setDiagnosticsOnOff(){
-    this.logFun('running setDiagnosticsOnOff ' )
+  setScrDiagOnOff(){
+    this.logFun('1350 running setScrDiagOnOff ' )
     // as of Spring 2021, control diagnostics with ctrl+alt+shift
     if (this.showDiagHtml == true) {
       this.showDiagHtml = false
-      this.debugLvl=0 
-      this.msg1 = 'diagnostics and debug turned off.'
+      this.msg1 = 'diagnostics turned off.'
     }else{
       this.showDiagHtml = true
-      this.debugLvl=1 
-      this.msg1 = 'diagnostics and debug turned on.'
+      this.msg1 = 'diagnostics turned on.'
     } // end if
-  } // end setDiagnosticsOnOff
+  } // end setScrDiagOnOff
 
 } //end class QuestComponent
 
@@ -1373,7 +1379,7 @@ export class QuestComponent implements OnInit {
 //the halt is only for this func, until the promise is resolved.
 //the main pgm is SNEAKY and will continue on, 
 //immediately running the next lines of code in caller-function.
-//my-async-function will continue after await, once the promise is resolved.
+//once the promise is resolved, my-async-function will continue after await.
 ////////////////////////////////////////////////////////////////
 // TypeScript is not a first-class citizen 
 // - I'm learning Angular 2 and, as a byproduct, 
@@ -1382,5 +1388,5 @@ export class QuestComponent implements OnInit {
 // lotsa time just trying to satisfy the type-checker. 
 //// my way to test for numeric:
 // if (Number('hello'))  {alert(115)} 
-// if (Number('116'))    {alert(116)}
 // if (Number(117))      {alert(117)}
+//

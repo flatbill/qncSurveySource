@@ -6,9 +6,17 @@
     *ngIf='msg1.length > 0'>
     {{msg1}} 
   </span>
+  &nbsp;
+  <button 
+    *ngIf='showDiagHtml'
+    class= 'is-link is-small is-outlined'
+    (click)='launchFirestoreReadSurveys()'
+  >
+  firestoreReadSurvey</button>
 </div>
  
 <section *ngIf="showSignHtml" class='mr-2 ml-3 mt-3' >
+  <div class='subtitle mt-3 mb-3'>{{surveyName}}</div>
   <table class=' table has-background-success-light is-narrow'>
     <tr>
       <td><label>First Name: </label></td>
@@ -50,7 +58,49 @@
   &nbsp;
 </section>
 
-<button *ngIf="showDiagButHtml" class='button is-link'(click)='setDiagnosticsOnOff()'>
+
+
+<section *ngIf="showQuestHtml" class="hero">
+  <div class="hero-body">
+    <div class="container">
+      <h3 *ngIf='!questHasLinBrk' class="subtitle mb-5 has-text-centered"> 
+        {{curPreQuest}}  </h3>
+      <h3 *ngIf='questHasLinBrk' class="subtitlev mb-5">         
+        {{curPreQuest}}  </h3>
+      <h2 *ngIf='!questHasLinBrk' class='title  has-text-centered'> 
+        {{curQuestTxt}} </h2>
+      <h2 *ngIf='questHasLinBrk' class='title  selz-pre-line'> 
+        {{curQuestTxt}} </h2>
+    </div>
+  </div>
+</section >
+
+<div *ngIf="showAnswerGroupHtml" class="level is-mobile">
+  <div *ngFor="let caf of curAcaFrame"
+        class='level-item has-text-weight-semibold'  > {{caf}}
+  </div>
+</div>
+
+<div *ngIf="showAnswerGroupHtml" class="columns is-mobile box "> 
+  <div class="column" *ngFor="let x of curAca; let i = index">
+    <button class='button is-link is-fullwidth'
+    (click)='answerClicked(i)'>{{x}}</button>
+  </div>
+</div>
+
+ 
+<div *ngIf="showDoneHtml" class=" ml-3 mr-3 has-background-primary-light" >  
+  Your results have been forwarded to an administrator.
+  <br>
+    This QnA Tool was created by the 
+    <a href="https://flyTechFree.com">Fly Tech Free </a> company.  
+  <br>
+  We appreciate your comments about this particular QnA or the QnA Tool in general. 
+  <br> 
+  Please email us at: <b>flyTechFree@gmail.com </b>
+</div>
+
+<button *ngIf="showDiagButHtml" class='button is-link'(click)='setScrDiagOnOff()'>
   show/hide diagnostics 
 </button>
 
@@ -58,22 +108,9 @@
 <section *ngIf="showDiagHtml" class='ml-2' >
   <div>
     previous answer points: {{hisAnsPoints}} <br>
-    answers stored to db so far:  {{answerCnt}} <br>
-    scoring rounds completed so far: {{scoreRound-1}} <br>
-    scores stored to db so far:  {{scoreRecsWritten}} <br>
-  </div>
-  <div>
-    <button class='button is-link'(click)='massDeleteAnswers()'>
-      mass delete answers
-    </button>
-    <br>
-    <br>
-    <button class='button is-link'(click)='massDeleteScores()'>
-      mass delete scores
-    </button>  
-    <br>
-    <br>
-
+    <!-- answers stored to db so far:  {{answerCnt}} <br> -->
+    <!-- scoring rounds completed so far: {{scoreRound-1}} <br>
+    scores stored to db so far:  {{scoreRecsWritten}} <br> -->
   </div>
 
   <table class='table is-striped  is-bordered'>
@@ -141,11 +178,32 @@
     </thead>
     <tbody>
       <tr *ngFor="let q of activeQuestions">
-        <th> {{q.questNbr}} </th>
-        <th> {{q.preQuest}} </th>
-        <th> {{q.questTxt}} </th>
-        <th> {{q.subset}}   </th>
-        <th> {{q.accum[0]}} </th>
+        <td> {{q.questNbr}} </td>
+        <td> {{q.preQuest}} </td>
+        <td> {{q.questTxt}} </td>
+        <td> {{q.subset}}   </td>
+        <td> {{q.accum[0]}} </td>
+      </tr>
+    </tbody>
+  </table>
+  
+  <table class='table is-striped  is-bordered'>
+    <thead class='has-background-info'>
+      <tr> 
+        <th>cust</th>
+        <th>qid</th>
+        <th>groupNbr</th>
+        <th>groupName</th>
+        <th>seq</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let g of groupArray">
+        <td> {{g.cust}} </td>
+        <td> {{g.qid}} </td>
+        <td> {{g.groupNbr}} </td>
+        <td> {{g.groupName}}   </td>
+        <td> {{g.seq}}   </td>
       </tr>
     </tbody>
   </table>
@@ -153,35 +211,3 @@
 </section>
 <!-- end diagnostics -->
 
-<section *ngIf="showQuestHtml" class="hero">
-  <div class="hero-body">
-    <div class="container">
-      <h3 *ngIf='!questHasLinBrk' class="subtitle mb-5 has-text-centered"> 
-        {{curPreQuest}}  </h3>
-      <h3 *ngIf='questHasLinBrk' class="subtitlev mb-5">         
-        {{curPreQuest}}  </h3>
-      <h2 *ngIf='!questHasLinBrk' class='title  has-text-centered'> 
-        {{curQuestTxt}} </h2>
-      <h2 *ngIf='questHasLinBrk' class='title  selz-pre-line'> 
-        {{curQuestTxt}} </h2>
-    </div>
-  </div>
-</section >
-
-<div *ngIf="showAnswerGroupHtml" class="level is-mobile">
-  <div *ngFor="let caf of curAcaFrame"
-        class='level-item has-text-weight-semibold'  > {{caf}}
-  </div>
-</div>
-
-<div *ngIf="showAnswerGroupHtml" class="columns is-mobile box "> 
-  <div class="column" *ngFor="let x of curAca; let i = index">
-    <button class='button is-link is-fullwidth'
-    (click)='answerClicked(i)'>{{x}}</button>
-  </div>
-</div>
-
- 
-<div *ngIf="showWrapUpHtml" class=" ml-3 mr-3 has-background-primary-light" >  
-  {{msg2}}
-</div>
